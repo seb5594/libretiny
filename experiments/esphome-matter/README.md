@@ -127,7 +127,9 @@ ergänzen; die Minimalfirmware misst deren zusätzlichen Speicherverbrauch nicht
 
 ```sh
 ruff check components tools tests
-ruff format --check components tools tests
+autoflake -r --check --remove-unused-variables components tools tests
+black --check components tools tests
+(cd ../.. && isort --profile black . --check-only)
 clang-format --dry-run --Werror components/libretiny_matter_probe/*.h components/libretiny_matter_probe/*.cpp
 esphome compile tests/host.yaml
 pytest -q

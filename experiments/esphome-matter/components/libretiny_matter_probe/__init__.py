@@ -17,9 +17,13 @@ LibreTinyMatterProbe = probe_ns.class_("LibreTinyMatterProbe", cg.PollingCompone
 
 def _validate(config):
     if not (CORE.is_libretiny or CORE.is_host):
-        raise cv.Invalid("This probe requires LibreTiny (or host for development tests)")
+        raise cv.Invalid(
+            "This probe requires LibreTiny (or host for development tests)"
+        )
     if config[CONF_UDP_ECHO]:
-        socket.consume_sockets(1, "libretiny_matter_probe", socket.SocketType.UDP)(config)
+        socket.consume_sockets(1, "libretiny_matter_probe", socket.SocketType.UDP)(
+            config
+        )
     return config
 
 

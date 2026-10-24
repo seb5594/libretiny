@@ -21,7 +21,9 @@ def destination(address: str, interface: str | None, port: int) -> tuple:
     if scope:
         scope_id = int(scope) if scope.isdecimal() else socket.if_nametoindex(scope)
     if (ip.is_link_local or ip.is_multicast) and not scope_id:
-        raise ValueError("Link-local/multicast destinations require --interface or %interface")
+        raise ValueError(
+            "Link-local/multicast destinations require --interface or %interface"
+        )
     if not 49152 <= port <= 65535:
         raise ValueError("Port must be in the probe range 49152..65535")
     return (str(ip).split("%", 1)[0], port, 0, scope_id)
@@ -88,7 +90,9 @@ def probe(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("address", help="IPv6 literal, optionally followed by %%interface")
+    parser.add_argument(
+        "address", help="IPv6 literal, optionally followed by %%interface"
+    )
     parser.add_argument("--interface", help="Local interface name or numeric index")
     parser.add_argument("--port", type=int, default=49152)
     parser.add_argument("--count", type=int, default=5)

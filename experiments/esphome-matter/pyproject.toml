@@ -4,7 +4,11 @@ pythonpath = ["."]
 
 [tool.ruff]
 target-version = "py312"
-line-length = 100
+line-length = 88
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B"]
+# Import ordering is checked by the repository's isort invocation.
+select = ["E", "F", "UP", "B"]
+
+[tool.black]
+line-length = 88

@@ -9,7 +9,8 @@
 - 15 pytest-Prüfungen bestanden: echte IPv6-Roundtrips, fehlender Listener,
   verworfene kurze/falsche/übergroße Datagramme mit anschließendem gültigem
   Roundtrip, IPv6-Scopevalidierung und ungültige ESPHome-Konfigurationen.
-- Ruff-Prüfung und Formatprüfung sowie clang-format erfolgreich.
+- Ruff, autoflake, Black, isort und clang-format erfolgreich. Die Python-Formatierung
+  folgt den Black-/isort-Vorgaben des übergeordneten LibreTiny-Repositories.
 
 | Profil | IPv6 / Echo | Flash laut Build | ausgewiesenes Flashlimit | statisches RAM laut Build |
 | --- | --- | ---: | ---: | ---: |
@@ -50,8 +51,12 @@ Vergleichen diese tatsächlich aufgelösten Versionen erneut festhalten.
 - Matter-Flash-/Heapbudget, OTA-Verhalten, Dauerbetrieb oder Stromverbrauch.
 - BLE/WLAN-Koexistenz auf T1 oder erfolgreiche Matter-Einrichtung mit einem Controller.
 
-Die zusätzliche GitHub-Actions-Datei beschreibt dieselben Prüfungen. Lokale
-Ergebnisse sind von einem tatsächlichen grünen GitHub-Actions-Lauf zu unterscheiden.
+Die zusätzliche GitHub-Actions-Datei beschreibt dieselben Prüfungen. Die Hosttests
+und alle vier Firmwarebuilds sind auch im ersten GitHub-Actions-Lauf erfolgreich.
+Der übergeordnete Python-Check beanstandete zunächst drei Dateien, weil das
+Experiment Ruff-Formatierung mit 100 Zeichen verwendete, das Repository jedoch
+Black-Formatierung mit 88 Zeichen prüft. Beide Workflows verwenden jetzt Black
+und isort; Ruff bleibt für zusätzliche Codeprüfungen aktiv.
 
 ## Hardwareprotokoll für den nächsten Schritt
 

@@ -8,7 +8,6 @@ import time
 from pathlib import Path
 
 import pytest
-
 from tools.check_udp import destination, probe
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -19,14 +18,18 @@ def server(tmp_path_factory):
     binary = Path(
         os.environ.get(
             "PROBE_BINARY",
-            ROOT / "tests/.esphome/build/matter-probe-host/.pioenvs/matter-probe-host/program",
+            ROOT
+            / "tests/.esphome/build/matter-probe-host"
+            / ".pioenvs/matter-probe-host/program",
         )
     )
     if not binary.is_file():
         pytest.fail("Build tests/host.yaml first, or set PROBE_BINARY")
     workdir = tmp_path_factory.mktemp("host")
     with (workdir / "host.log").open("w+") as log:
-        process = subprocess.Popen([str(binary)], cwd=workdir, stdout=log, stderr=subprocess.STDOUT)
+        process = subprocess.Popen(
+            [str(binary)], cwd=workdir, stdout=log, stderr=subprocess.STDOUT
+        )
         try:
             deadline = time.monotonic() + 10
             while time.monotonic() < deadline and process.poll() is None:
@@ -63,7 +66,14 @@ def test_ipv6_round_trip(server):
         b"LTM1" + bytes(17),
         b"LTM1" + bytes(4096),
     ],
-    ids=["empty", "short-magic", "short-nonce", "wrong-magic", "extra-byte", "oversized"],
+    ids=[
+        "empty",
+        "short-magic",
+        "short-nonce",
+        "wrong-magic",
+        "extra-byte",
+        "oversized",
+    ],
 )
 def test_invalid_packets_are_not_echoed(server, packet):
     with socket.socket(socket.AF_INET6, socket.SOCK_DGRAM) as sock:

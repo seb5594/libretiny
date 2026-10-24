@@ -27,8 +27,12 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r requirements-dev.txt
+      - run: autoflake -r --check --remove-unused-variables components tools tests
+      - run: black --check components tools tests
+      - name: Check imports using repository settings
+        working-directory: .
+        run: isort --profile black . --check-only
       - run: ruff check components tools tests
-      - run: ruff format --check components tools tests
       - run: clang-format --dry-run --Werror components/libretiny_matter_probe/*.h components/libretiny_matter_probe/*.cpp
       - run: esphome compile tests/host.yaml
       - run: pytest -q
