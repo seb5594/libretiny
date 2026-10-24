@@ -1,0 +1,7 @@
+.esphome/
+.venv/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+examples/secrets.yaml
+artifacts/

@@ -1,0 +1,49 @@
+name: ESPHome Matter prerequisite probe
+
+on:
+  push:
+    paths:
+      - experiments/esphome-matter/**
+      - .github/workflows/matter-probe.yml
+  pull_request:
+    paths:
+      - experiments/esphome-matter/**
+      - .github/workflows/matter-probe.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: experiments/esphome-matter
+
+jobs:
+  host:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check components tools tests
+      - run: ruff format --check components tools tests
+      - run: clang-format --dry-run --Werror components/libretiny_matter_probe/*.h components/libretiny_matter_probe/*.cpp
+      - run: esphome compile tests/host.yaml
+      - run: pytest -q
+
+  firmware:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        board: [bk7231n, bk7238-t1, ln882h, rtl8720cf]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements-dev.txt
+      - run: cp examples/secrets.yaml.example examples/secrets.yaml
+      - run: esphome compile examples/${{ matrix.board }}.yaml

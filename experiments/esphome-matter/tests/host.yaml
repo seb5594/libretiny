@@ -1,0 +1,18 @@
+esphome:
+  name: matter-probe-host
+
+host:
+logger:
+  level: DEBUG
+network:
+  enable_ipv6: true
+
+external_components:
+  - source:
+      type: local
+      path: ../components
+    components: [libretiny_matter_probe]
+
+libretiny_matter_probe:
+  udp_echo: true
+  update_interval: 1s
