@@ -14,7 +14,7 @@ external_components:
   - source:
       type: local
       path: /pfad/zu/libretiny/experiments/esphome-matter/components
-    components: [libretiny_matter_storage]
+    components: [libretiny_matter, libretiny_matter_storage]
 
 libretiny_matter_storage:
   id: matter_storage
@@ -79,16 +79,17 @@ hier keine Verschlüsselung ruhender Daten und keine Transaktion über mehrere K
 ## Wiederverwendeter Code
 
 - Unveränderte CHIP-Header aus `project-chip/connectedhomeip`, Commit
-  `4b4a3e405882afaf8161c0e4af244e65fa8f3f94`, Apache-2.0. Nur die acht Header für
-  Delegate und Fehlertypen sowie die Originallizenz liegen unter
-  `components/libretiny_matter_storage/vendor/connectedhomeip`.
+  `4b4a3e405882afaf8161c0e4af244e65fa8f3f94`, Apache-2.0. Delegate und Fehlertypen
+  liegen zusammen mit den benötigten Codecs unter
+  `components/libretiny_matter/vendor/connectedhomeip`; beide Komponenten verwenden
+  denselben Upstream-Stand. Siehe auch [Protokolltests](protocol-tests.md).
 - `upstream.json` enthält Ursprung und SHA-256 jeder übernommenen Datei. Die
   Tests prüfen diese Prüfsummen. Upstream-Formatierung und Copyright bleiben erhalten.
 - LibreTinys FlashDB 1.2.0, Commit `d5c892f0c545884e9f0de0cf67215e426dc8109d`.
   Firmware nutzt das vorhandene Framework-Paket; `tools/fetch_flashdb.py` lädt
   denselben Stand für Hosttests. Keine zweite FlashDB wird in die Firmware gelinkt.
 
-Die Header werden als lokale PlatformIO-Bibliothek eingebunden. Ein späterer
+Die Quellen werden als lokale PlatformIO-Bibliothek eingebunden. Ein späterer
 vollständiger CHIP-Build muss diese Teilbibliothek ersetzen und überall dieselbe
 CHIP-Version sowie Konfiguration verwenden; zwei verschiedene CHIP-Headerstände
 im selben Programm sind nicht unterstützt.

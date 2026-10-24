@@ -1,0 +1,10 @@
+substitutions:
+  device_name: matter-protocol-ln882h
+
+packages:
+  base: !include ln882h.yaml
+  protocol: !include protocol-test-local.yaml
+
+ln882x:
+  framework:
+    source: https://github.com/libretiny-eu/libretiny.git#v1.14.0

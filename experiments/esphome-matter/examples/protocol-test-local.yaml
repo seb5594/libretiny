@@ -1,0 +1,17 @@
+# Include this package in an existing device YAML in this directory.
+external_components:
+  - source:
+      type: local
+      path: ../components
+    components: [libretiny_matter, libretiny_matter_protocol]
+
+libretiny_matter_protocol:
+  id: matter_protocol_test
+  run_on_boot: true
+
+button:
+  - platform: template
+    name: Matter codec self-test
+    entity_category: diagnostic
+    on_press:
+      - lambda: id(matter_protocol_test).run_tests();

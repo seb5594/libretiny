@@ -10,7 +10,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 COMPONENT = ROOT / "components/libretiny_matter_storage"
-VENDOR = COMPONENT / "vendor/connectedhomeip"
+VENDOR = ROOT / "components/libretiny_matter/vendor/connectedhomeip"
 
 
 def test_upstream_headers_are_unmodified():

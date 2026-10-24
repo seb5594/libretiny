@@ -1,0 +1,10 @@
+substitutions:
+  device_name: matter-protocol-bk7238-t1
+
+packages:
+  base: !include bk7238-t1.yaml
+  protocol: !include protocol-test-local.yaml
+
+bk72xx:
+  framework:
+    source: https://github.com/libretiny-eu/libretiny.git#v1.14.0

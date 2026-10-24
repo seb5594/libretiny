@@ -2,8 +2,8 @@
 
 **Stand: Experiment, kein Matter-Server.** Dieses Verzeichnis enthält eine
 kompilierbare ESPHome External Components, vier Diagnoseprofile, zwei Beken-Profile
-mit nativem Matter-Speicheradapter, einen IPv6-Testclient und Tests. Es implementiert
-weder Pairing noch Matter-Cluster oder Zigbee.
+mit nativem Matter-Speicheradapter, vier Protokolltestprofile, einen IPv6-Testclient
+und Tests. Es implementiert noch kein Pairing, keinen Cluster-Server und kein Zigbee.
 
 Ziel bleibt ein nativer Matter-Port für **BK7231N zuerst, BK7238/Tuya T1 danach**.
 LibreTiny bleibt die Buildplattform. LN882H und RTL8720C sind weitere Kandidaten.
@@ -13,6 +13,11 @@ Die Ergebnisse und die noch fehlenden Teile sind in
 
 ## Was bereits funktioniert
 
+- Originale CHIP-TLV- und Interaction-Model-Codecs erzeugen und lesen On/Off-
+  Aufrufnutzdaten. Ein Selbsttest mit 72 Prüfungen lässt sich als Package in
+  vorhandene ESPHome-Geräte mit offizieller LibreTiny-Plattform aufnehmen:
+  **[Anleitung und Testbeispiel](docs/protocol-tests.md)**. Das ist noch kein
+  Matter-Netzwerkendpunkt; es werden keine Gerätefunktionen ausgelöst.
 - Der neue `libretiny_matter_storage`-Adapter implementiert die originale
   `chip::PersistentStorageDelegate`-Schnittstelle über LibreTinys bestehende FlashDB.
   Schlüssel bleiben vollständig erhalten; Binärwerte, leere Werte, Teil-Lesezugriffe,
@@ -139,13 +144,14 @@ ruff check components tools tests
 autoflake -r --check --remove-unused-variables components tools tests
 black --check components tools tests
 (cd ../.. && isort --profile black . --check-only)
-clang-format --dry-run --Werror components/libretiny_matter_probe/*.h components/libretiny_matter_probe/*.cpp components/libretiny_matter_storage/*.h components/libretiny_matter_storage/*.cpp tests/storage/*.h tests/storage/*.cpp
+clang-format --dry-run --Werror components/libretiny_matter_probe/*.h components/libretiny_matter_probe/*.cpp components/libretiny_matter_storage/*.h components/libretiny_matter_storage/*.cpp components/libretiny_matter_protocol/*.h components/libretiny_matter_protocol/*.cpp tests/storage/*.h tests/storage/*.cpp tests/protocol_cli.cpp
 esphome compile tests/host.yaml
+esphome compile tests/protocol-host.yaml
 python tools/fetch_flashdb.py
 pytest -q
 ```
 
-Die GitHub-Actions-Datei `matter-probe.yml` führt Hosttests und sechs Firmwarebuilds
+Die GitHub-Actions-Datei `matter-probe.yml` führt Hosttests und zehn Firmwarebuilds
 aus. [Prüfergebnisse](docs/validation.md) trennen lokale Builds, Hosttests und die
 noch ausstehenden Messungen auf echter Hardware.
 

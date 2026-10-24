@@ -1,0 +1,2 @@
+# Preserve upstream nLIO byte-for-byte; upstream.json verifies file contents.
+third_party/nlio/repo/** -whitespace

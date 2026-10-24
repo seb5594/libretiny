@@ -4,13 +4,17 @@
 
 - ESPHome 2026.10.0, Python 3.12.14, LibreTiny 1.14.0 aus
   `seb5594/libretiny@c81bc9cef83ffd42fcffce32b8b08793b2400b9f`.
-- Vier Diagnoseprofile und zwei Beken-Speicherprofile vollständig kompiliert und
-  verlinkt; UF2-Dateien erzeugt.
+- Vier Diagnoseprofile, zwei Beken-Speicherprofile und vier Codec-Testprofile
+  vollständig kompiliert und verlinkt; UF2-Dateien erzeugt. Die Codec-Testprofile
+  verwenden die offizielle LibreTiny-Version 1.14.0.
 - ESPHome-Hostprogramm mit demselben Probe-C++-Code kompiliert und ausgeführt.
-- 21 pytest-Prüfungen bestanden: echte IPv6-Roundtrips, fehlender Listener,
+- 65 pytest-Prüfungen bestanden: echte IPv6-Roundtrips, fehlender Listener,
   verworfene kurze/falsche/übergroße Datagramme mit anschließendem gültigem
   Roundtrip, IPv6-Scopevalidierung, ungültige ESPHome-Konfigurationen und die neuen
-  Speicherprüfungen mit originalen CHIP-Headern und echter FlashDB.
+  Speicherprüfungen mit originalen CHIP-Headern und echter FlashDB sowie die neuen
+  Codec-Prüfungen. Die tatsächliche ESPHome-Hostkomponente meldet 72 erfolgreiche
+  Codec-Einzelprüfungen. Zusätzliche Parser-Tests laufen mit AddressSanitizer und
+  UndefinedBehaviorSanitizer, einschließlich 20.000 reproduzierbarer Zufallseingaben.
 - Ruff, autoflake, Black, isort und clang-format erfolgreich. Die Python-Formatierung
   folgt den Black-/isort-Vorgaben des übergeordneten LibreTiny-Repositories.
 
@@ -22,10 +26,16 @@
 | RTL8720CF 2M/992k | aus | 435.769 B | 1.015.808 B | 12.841 B |
 | BK7231N + CHIP-Speicheradapter | einkompiliert | 502.490 B | 1.083.136 B | 47.644 B |
 | BK7238/T1 + CHIP-Speicheradapter | einkompiliert | 603.032 B | 1.083.136 B | 51.552 B |
+| BK7231N + Codec-Selbsttest | einkompiliert | 508.878 B | 1.083.136 B | 47.684 B |
+| BK7238/T1 + Codec-Selbsttest | einkompiliert | 609.416 B | 1.083.136 B | 51.592 B |
+| LN882H + Codec-Selbsttest | aus | 417.792 B | 1.228.800 B | 94.400 B |
+| RTL8720CF + Codec-Selbsttest | aus | 443.117 B | 1.015.808 B | 12.841 B |
 
 Das sind **Firmwarewerte ohne vollständigen Matter-Stack**. Die letzten beiden
-Profile enthalten den echten CHIP-Speicheradapter; der Mehrbedarf gegenüber den
-Diagnoseprofilen liegt bei rund 1,7 KiB Flash. Das Buildsystem bewertet je nach
+Speicherprofile enthalten den echten CHIP-Speicheradapter; der Mehrbedarf gegenüber
+den Diagnoseprofilen liegt bei rund 1,7 KiB Flash. Die Codec-Testprofile enthalten
+originale TLV-/InvokeRequest-Codecs, Selbsttests und den Diagnosebutton, mit rund
+7–8 KiB zusätzlichem Flashbedarf. Das Buildsystem bewertet je nach
 Plattform unterschiedliche Speichersegmente; insbesondere die kleinen statischen
 RTL-Zahlen dürfen nicht als Gesamtbedarf interpretiert werden. Laufzeit-Heap,
 Wi-Fi-/RTOS-Reservierungen, Bootloader, OTA und CHIP-Spitzenbedarf sind darin nicht
@@ -43,6 +53,9 @@ erkannt. Eine volle 32-KiB-Partition wird geprüft, dann Speicher durch Löschen
 FlashDB-Garbage-Collection wiederverwendet. Ein separater Prozess liest ein
 persistiertes Flashabbild einschließlich leerem und gelöschtem Schlüssel.
 Die Testfälle enthalten keine echten Fabric-Schlüssel oder Zertifikate.
+Die Codec-Tests verwenden bekannte Off-/On-/Toggle-Nutzdaten. Sie enthalten keine
+verschlüsselten Sessions oder Hardwarezugriffe. Details und das Package für
+vorhandene Geräte stehen in [protocol-tests.md](protocol-tests.md).
 
 ## Verwendete Plattformabhängigkeiten
 
@@ -63,7 +76,9 @@ Vergleichen diese tatsächlich aufgelösten Versionen erneut festhalten.
 - Boot oder WLAN-/IPv6-Verhalten auf einem physischen Testgerät.
 - Multicastübertragung durch einen realen Access Point; eine lokale
   `IPV6_JOIN_GROUP`-Erfolgsmeldung genügt hierfür nicht.
-- mDNS/DNS-SD für Matter, PASE, CASE, Attestation, Fabrics, Cluster und Subscriptions.
+- mDNS/DNS-SD für Matter, PASE, CASE, Attestation, echte Fabrics, Cluster-Server
+  und Subscriptions. Das Lesen/Schreiben von InvokeRequest-Nutzdaten ist separat
+  durch Codec-Tests belegt und ersetzt diese fehlenden Schichten nicht.
 - Kryptografisch sichere Entropieanbindung auf den Beken-Boards.
 - Stromausfallsicherheit während Schreib-/Löschvorgängen und vollständige
   Fehlerpropagierung der FlashDB-Metadatenpfade; Grenzen in [storage.md](storage.md).

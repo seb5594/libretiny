@@ -1,8 +1,9 @@
 # Zielarchitektur und nachprüfbare Meilensteine
 
-Diagnosekomponente und ein nativer FlashDB-Adapter für die originale
-`chip::PersistentStorageDelegate`-Schnittstelle sind implementiert. Die übrigen
-Schichten sind geplant; es gibt noch keinen Matter-Server.
+Diagnosekomponente, nativer FlashDB-Adapter und originale CHIP-Codecs für TLV und
+InvokeRequest-Nutzdaten sind eingebunden. Die Codecs sind auf dem Host getestet
+und als Selbsttest auf den Ziel-MCUs baubar. Die übrigen Schichten sind geplant;
+es gibt noch keinen Matter-Server.
 
 ## Grenzen der Schichten
 
@@ -42,6 +43,7 @@ PASE/CASE, TLV und das Interaction Model werden nicht neu erfunden.
 | --- | --- | --- |
 | 0 — vorhanden | Diagnosekomponente, LibreTiny-Builds, IPv6-Client, Hosttests | Lokale Ergebnisse in `validation.md`; Hardwaremessungen noch offen |
 | 0a — vorhanden | CHIP-Speicherschnittstelle auf bestehender ESPHome-FlashDB, Beken-Builds | [Speicheradapter](storage.md): Vertrag, Fehlerfälle und Prozessneustart mit echter FlashDB getestet; Hardware-Stromausfalltest offen |
+| 0b — vorhanden | Native CHIP-TLV-/InvokeRequest-Codecs und Selbsttest-Package für bestehende Geräte | [Protokolltests](protocol-tests.md): feste Bytevektoren, Grenzfälle, Sanitizer, begrenztes Fuzzing; MCU-Laufzeitlogs offen |
 | 1 | Beken-IPv6 einschließlich mDNS/Multicast und Speicher erfassen | UART-Logs, Unicast-/Multicastantworten, WLAN-Reconnect, Langzeitlauf auf N und T1 |
 | 2 | CHIP mit ARMv5TE-Toolchain in LibreTiny einbinden; Entropie, Zeit, KVS und Task anbinden | Verlinkter Server, nachvollziehbare Lizenz-/Versionsliste, getestete Entropiefehler und persistente Fabric-Daten |
 | 3 | Ein On/Off-Endpunkt, vorhandenes WLAN, kleiner begrenzter Ressourcenbedarf | Pairing, On/Off, Attribute-Read/Subscribe, Reboot und Wiederverbindung mit einem Controller |

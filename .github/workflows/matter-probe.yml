@@ -33,8 +33,9 @@ jobs:
         working-directory: .
         run: isort --profile black . --check-only
       - run: ruff check components tools tests
-      - run: clang-format --dry-run --Werror components/libretiny_matter_probe/*.h components/libretiny_matter_probe/*.cpp components/libretiny_matter_storage/*.h components/libretiny_matter_storage/*.cpp tests/storage/*.h tests/storage/*.cpp
+      - run: clang-format --dry-run --Werror components/libretiny_matter_probe/*.h components/libretiny_matter_probe/*.cpp components/libretiny_matter_storage/*.h components/libretiny_matter_storage/*.cpp components/libretiny_matter_protocol/*.h components/libretiny_matter_protocol/*.cpp tests/storage/*.h tests/storage/*.cpp tests/protocol_cli.cpp
       - run: esphome compile tests/host.yaml
+      - run: esphome compile tests/protocol-host.yaml
       - run: python tools/fetch_flashdb.py
       - run: pytest -q
 
@@ -43,7 +44,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        board: [bk7231n, bk7238-t1, ln882h, rtl8720cf, bk7231n-storage, bk7238-t1-storage]
+        board: [bk7231n, bk7238-t1, ln882h, rtl8720cf, bk7231n-storage, bk7238-t1-storage, bk7231n-protocol, bk7238-t1-protocol, ln882h-protocol, rtl8720cf-protocol]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

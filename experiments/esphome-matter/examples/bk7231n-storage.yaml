@@ -8,7 +8,7 @@ external_components:
   - source:
       type: local
       path: ../components
-    components: [libretiny_matter_storage]
+    components: [libretiny_matter, libretiny_matter_storage]
 
 libretiny_matter_storage:
   id: matter_storage

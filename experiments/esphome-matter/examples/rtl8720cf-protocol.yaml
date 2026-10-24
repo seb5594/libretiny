@@ -1,0 +1,10 @@
+substitutions:
+  device_name: matter-protocol-rtl8720cf
+
+packages:
+  base: !include rtl8720cf.yaml
+  protocol: !include protocol-test-local.yaml
+
+rtl87xx:
+  framework:
+    source: https://github.com/libretiny-eu/libretiny.git#v1.14.0
