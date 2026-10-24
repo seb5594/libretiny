@@ -1,8 +1,9 @@
 # ESPHome / LibreTiny: Vorbereitung für Matter über WLAN
 
 **Stand: Experiment, kein Matter-Server.** Dieses Verzeichnis enthält eine
-kompilierbare ESPHome External Component, vier LibreTiny-Profile, einen IPv6-Testclient
-und Tests. Es implementiert weder Pairing noch Matter-Cluster oder Zigbee.
+kompilierbare ESPHome External Components, vier Diagnoseprofile, zwei Beken-Profile
+mit nativem Matter-Speicheradapter, einen IPv6-Testclient und Tests. Es implementiert
+weder Pairing noch Matter-Cluster oder Zigbee.
 
 Ziel bleibt ein nativer Matter-Port für **BK7231N zuerst, BK7238/Tuya T1 danach**.
 LibreTiny bleibt die Buildplattform. LN882H und RTL8720C sind weitere Kandidaten.
@@ -12,6 +13,11 @@ Die Ergebnisse und die noch fehlenden Teile sind in
 
 ## Was bereits funktioniert
 
+- Der neue `libretiny_matter_storage`-Adapter implementiert die originale
+  `chip::PersistentStorageDelegate`-Schnittstelle über LibreTinys bestehende FlashDB.
+  Schlüssel bleiben vollständig erhalten; Binärwerte, leere Werte, Teil-Lesezugriffe,
+  Löschung, volle Partition und Persistenz nach Prozessneustart sind getestet.
+  Aufbau, Grenzen und Nutzung: [Matter-Speicheradapter](docs/storage.md).
 - ESPHome validiert die Konfiguration und erzeugt Firmware über LibreTiny.
 - Auf BK7231N und BK7238/T1 wird IPv6 einkompiliert. Die Komponente kann auf einem
   Testgerät einen nicht blockierenden UDP-Echo-Endpunkt öffnen und der experimentellen
@@ -44,6 +50,9 @@ cp examples/secrets.yaml.example examples/secrets.yaml
 # In secrets.yaml die WLAN-Daten des Testnetzes eintragen.
 esphome compile examples/bk7231n.yaml
 esphome compile examples/bk7238-t1.yaml
+# Dieselben Boards mit dem nativen CHIP-Speicheradapter:
+esphome compile examples/bk7231n-storage.yaml
+esphome compile examples/bk7238-t1-storage.yaml
 ```
 
 Für die weiteren Familien:
@@ -130,12 +139,13 @@ ruff check components tools tests
 autoflake -r --check --remove-unused-variables components tools tests
 black --check components tools tests
 (cd ../.. && isort --profile black . --check-only)
-clang-format --dry-run --Werror components/libretiny_matter_probe/*.h components/libretiny_matter_probe/*.cpp
+clang-format --dry-run --Werror components/libretiny_matter_probe/*.h components/libretiny_matter_probe/*.cpp components/libretiny_matter_storage/*.h components/libretiny_matter_storage/*.cpp tests/storage/*.h tests/storage/*.cpp
 esphome compile tests/host.yaml
+python tools/fetch_flashdb.py
 pytest -q
 ```
 
-Die GitHub-Actions-Datei `matter-probe.yml` führt Hosttests und vier Firmwarebuilds
+Die GitHub-Actions-Datei `matter-probe.yml` führt Hosttests und sechs Firmwarebuilds
 aus. [Prüfergebnisse](docs/validation.md) trennen lokale Builds, Hosttests und die
 noch ausstehenden Messungen auf echter Hardware.
 

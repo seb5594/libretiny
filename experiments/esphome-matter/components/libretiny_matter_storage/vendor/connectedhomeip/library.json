@@ -1,0 +1,9 @@
+{
+  "name": "MatterStorageInterface",
+  "version": "0.1.0",
+  "description": "Unmodified CHIP PersistentStorageDelegate headers; no Matter stack",
+  "license": "Apache-2.0",
+  "build": {
+    "includeDir": "src"
+  }
+}

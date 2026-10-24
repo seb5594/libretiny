@@ -1,4 +1,4 @@
-name: ESPHome Matter prerequisite probe
+name: ESPHome Matter port checks
 
 on:
   push:
@@ -33,8 +33,9 @@ jobs:
         working-directory: .
         run: isort --profile black . --check-only
       - run: ruff check components tools tests
-      - run: clang-format --dry-run --Werror components/libretiny_matter_probe/*.h components/libretiny_matter_probe/*.cpp
+      - run: clang-format --dry-run --Werror components/libretiny_matter_probe/*.h components/libretiny_matter_probe/*.cpp components/libretiny_matter_storage/*.h components/libretiny_matter_storage/*.cpp tests/storage/*.h tests/storage/*.cpp
       - run: esphome compile tests/host.yaml
+      - run: python tools/fetch_flashdb.py
       - run: pytest -q
 
   firmware:
@@ -42,7 +43,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        board: [bk7231n, bk7238-t1, ln882h, rtl8720cf]
+        board: [bk7231n, bk7238-t1, ln882h, rtl8720cf, bk7231n-storage, bk7238-t1-storage]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

@@ -1,7 +1,8 @@
 # Zielarchitektur und nachprüfbare Meilensteine
 
-Diese Datei beschreibt geplante Arbeit. Nur die Diagnosekomponente ist in diesem
-Stand implementiert; es gibt keinen versteckten oder simulierten Matter-Backend.
+Diagnosekomponente und ein nativer FlashDB-Adapter für die originale
+`chip::PersistentStorageDelegate`-Schnittstelle sind implementiert. Die übrigen
+Schichten sind geplant; es gibt noch keinen Matter-Server.
 
 ## Grenzen der Schichten
 
@@ -40,6 +41,7 @@ PASE/CASE, TLV und das Interaction Model werden nicht neu erfunden.
 | Schritt | Umsetzung | Nachweis für Abschluss |
 | --- | --- | --- |
 | 0 — vorhanden | Diagnosekomponente, LibreTiny-Builds, IPv6-Client, Hosttests | Lokale Ergebnisse in `validation.md`; Hardwaremessungen noch offen |
+| 0a — vorhanden | CHIP-Speicherschnittstelle auf bestehender ESPHome-FlashDB, Beken-Builds | [Speicheradapter](storage.md): Vertrag, Fehlerfälle und Prozessneustart mit echter FlashDB getestet; Hardware-Stromausfalltest offen |
 | 1 | Beken-IPv6 einschließlich mDNS/Multicast und Speicher erfassen | UART-Logs, Unicast-/Multicastantworten, WLAN-Reconnect, Langzeitlauf auf N und T1 |
 | 2 | CHIP mit ARMv5TE-Toolchain in LibreTiny einbinden; Entropie, Zeit, KVS und Task anbinden | Verlinkter Server, nachvollziehbare Lizenz-/Versionsliste, getestete Entropiefehler und persistente Fabric-Daten |
 | 3 | Ein On/Off-Endpunkt, vorhandenes WLAN, kleiner begrenzter Ressourcenbedarf | Pairing, On/Off, Attribute-Read/Subscribe, Reboot und Wiederverbindung mit einem Controller |
@@ -51,6 +53,12 @@ passenden Beken-Code wiederverwendet. Der offizielle Beken-Port und das ARM-SDK
 sind unterschiedliche Integrationsbasen und müssen anhand einer festgelegten
 CHIP-Version verglichen werden. Ein pauschaler Austausch von ESP-IDF-Includes
 oder ein ungetesteter Backend-Stub wäre kein fertiggestellter Schritt.
+
+Der vorhandene Speicheradapter ist ein Teil von Schritt 2, kein Abschluss davon.
+Er erlaubt Zugriffe nur aus dem ESPHome-Haupttask. Bevor ein CHIP-Worker eingeführt
+wird, muss die gemeinsame Datenbank über alle Leser/Schreiber hinweg synchronisiert
+werden. Ein Mutex nur um die drei neuen Delegate-Methoden würde ESPHomes vorhandene
+Preferences-Zugriffe nicht schützen.
 
 ## Regeln für den nativen Port
 

@@ -1,0 +1,14 @@
+substitutions:
+  device_name: matter-storage-bk7231n
+
+packages:
+  base: !include bk7231n.yaml
+
+external_components:
+  - source:
+      type: local
+      path: ../components
+    components: [libretiny_matter_storage]
+
+libretiny_matter_storage:
+  id: matter_storage

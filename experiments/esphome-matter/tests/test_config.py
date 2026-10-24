@@ -33,3 +33,23 @@ def test_reject_invalid_config(tmp_path, ipv6, port, expected):
     )
     assert result.returncode != 0
     assert expected in result.stdout + result.stderr
+
+
+def test_storage_rejects_unsupported_platform(tmp_path):
+    config = yaml.safe_load((ROOT / "tests/host.yaml").read_text())
+    config["external_components"][0]["source"]["path"] = str(ROOT / "components")
+    config["external_components"][0]["components"].append("libretiny_matter_storage")
+    config["libretiny_matter_storage"] = {}
+    path = tmp_path / "invalid-storage.yaml"
+    path.write_text(yaml.safe_dump(config))
+    result = subprocess.run(
+        [sys.executable, "-m", "esphome", "config", str(path)],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode != 0
+    assert (
+        "Matter storage currently requires LibreTiny BK72xx"
+        in result.stdout + result.stderr
+    )

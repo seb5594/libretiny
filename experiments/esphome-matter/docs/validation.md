@@ -4,11 +4,13 @@
 
 - ESPHome 2026.10.0, Python 3.12.14, LibreTiny 1.14.0 aus
   `seb5594/libretiny@c81bc9cef83ffd42fcffce32b8b08793b2400b9f`.
-- Vier Firmwareprofile vollständig kompiliert und verlinkt; UF2-Dateien erzeugt.
+- Vier Diagnoseprofile und zwei Beken-Speicherprofile vollständig kompiliert und
+  verlinkt; UF2-Dateien erzeugt.
 - ESPHome-Hostprogramm mit demselben Probe-C++-Code kompiliert und ausgeführt.
-- 15 pytest-Prüfungen bestanden: echte IPv6-Roundtrips, fehlender Listener,
+- 21 pytest-Prüfungen bestanden: echte IPv6-Roundtrips, fehlender Listener,
   verworfene kurze/falsche/übergroße Datagramme mit anschließendem gültigem
-  Roundtrip, IPv6-Scopevalidierung und ungültige ESPHome-Konfigurationen.
+  Roundtrip, IPv6-Scopevalidierung, ungültige ESPHome-Konfigurationen und die neuen
+  Speicherprüfungen mit originalen CHIP-Headern und echter FlashDB.
 - Ruff, autoflake, Black, isort und clang-format erfolgreich. Die Python-Formatierung
   folgt den Black-/isort-Vorgaben des übergeordneten LibreTiny-Repositories.
 
@@ -18,14 +20,29 @@
 | BK7238 Tuya T1 | einkompiliert | 601.344 B | 1.083.136 B | 51.528 B |
 | LN882H | aus | 409.816 B | 1.228.800 B | 94.332 B |
 | RTL8720CF 2M/992k | aus | 435.769 B | 1.015.808 B | 12.841 B |
+| BK7231N + CHIP-Speicheradapter | einkompiliert | 502.490 B | 1.083.136 B | 47.644 B |
+| BK7238/T1 + CHIP-Speicheradapter | einkompiliert | 603.032 B | 1.083.136 B | 51.552 B |
 
-Das sind **Diagnosefirmwarewerte ohne Matter**. Das Buildsystem bewertet je nach
+Das sind **Firmwarewerte ohne vollständigen Matter-Stack**. Die letzten beiden
+Profile enthalten den echten CHIP-Speicheradapter; der Mehrbedarf gegenüber den
+Diagnoseprofilen liegt bei rund 1,7 KiB Flash. Das Buildsystem bewertet je nach
 Plattform unterschiedliche Speichersegmente; insbesondere die kleinen statischen
 RTL-Zahlen dürfen nicht als Gesamtbedarf interpretiert werden. Laufzeit-Heap,
 Wi-Fi-/RTOS-Reservierungen, Bootloader, OTA und CHIP-Spitzenbedarf sind darin nicht
 vollständig abgebildet. Die Host-Pakettests prüfen die Komponente, nicht Beken-lwIP
 oder den Funkchip. Hersteller-SDKs erzeugen beim Bauen bestehende Compilerwarnungen;
 der Build ist kein Warnungsfreiheitsnachweis des gesamten SDKs.
+
+Die Speichertests prüfen Binärdaten, leere Werte und deren Überschreiben,
+32-Byte-Schlüssel, 2-KiB-Werte, ungültige Parameter, Teil-Lesezugriffe, Existenz und
+Löschen, Isolation numerischer ESPHome-Schlüssel, Aufrufe aus einem fremden Task
+sowie Zugriffe vor Bindung/nach Deinitialisierung. Der NOR-Simulator erzwingt
+1→0-Programmierung und 4-KiB-Löschgrenzen. Fehler werden für neue und bestehende
+Werte, Löschen und Blob-Lesen injiziert; CRC-Fehler eines gecachten Eintrags werden
+erkannt. Eine volle 32-KiB-Partition wird geprüft, dann Speicher durch Löschen und
+FlashDB-Garbage-Collection wiederverwendet. Ein separater Prozess liest ein
+persistiertes Flashabbild einschließlich leerem und gelöschtem Schlüssel.
+Die Testfälle enthalten keine echten Fabric-Schlüssel oder Zertifikate.
 
 ## Verwendete Plattformabhängigkeiten
 
@@ -48,6 +65,8 @@ Vergleichen diese tatsächlich aufgelösten Versionen erneut festhalten.
   `IPV6_JOIN_GROUP`-Erfolgsmeldung genügt hierfür nicht.
 - mDNS/DNS-SD für Matter, PASE, CASE, Attestation, Fabrics, Cluster und Subscriptions.
 - Kryptografisch sichere Entropieanbindung auf den Beken-Boards.
+- Stromausfallsicherheit während Schreib-/Löschvorgängen und vollständige
+  Fehlerpropagierung der FlashDB-Metadatenpfade; Grenzen in [storage.md](storage.md).
 - Matter-Flash-/Heapbudget, OTA-Verhalten, Dauerbetrieb oder Stromverbrauch.
 - BLE/WLAN-Koexistenz auf T1 oder erfolgreiche Matter-Einrichtung mit einem Controller.
 
