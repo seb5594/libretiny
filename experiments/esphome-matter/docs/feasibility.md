@@ -1,14 +1,14 @@
 # Machbarkeit und Quellen
 
-Untersucht am 24.10.2026. Eine bestandene Kompilierung ist kein Nachweis für
+Untersucht am 24./25.10.2026. Eine bestandene Kompilierung ist kein Nachweis für
 Funkbetrieb, Pairing, Interoperabilität oder Zertifizierung.
 
 ## Entscheidung pro MCU
 
 | MCU | Zigbee ohne zusätzliche Funkhardware | Matter über WLAN | Nächste technische Hürde |
 | --- | --- | --- | --- |
-| BK7231N | Kein dokumentiertes IEEE-802.15.4-Funkmodul | Plausibler Portierungskandidat; noch nicht implementiert | Laufzeit-Heap, verlässliche Entropie, CHIP-Anbindung und Flashbudget |
-| BK7238 / Tuya T1 | Kein dokumentiertes IEEE-802.15.4-Funkmodul | Besonders konkreter Ansatz durch veröffentlichtes ARM-Beken-Matter-SDK | LibreTiny-Integration, andere Partitionen, BLE/WLAN-Koexistenz |
+| BK7231N | Kein dokumentiertes IEEE-802.15.4-Funkmodul | Nativer rs-matter-Server gebaut; Host-Interoperabilität bestanden | Funkbetrieb, Laufzeit-Heap/Stack und TRNG auf Hardware messen |
+| BK7238 / Tuya T1 | Kein dokumentiertes IEEE-802.15.4-Funkmodul | Derselbe native rs-matter-Server gebaut; offizielles LibreTiny | Hardwaremessung; BLE/WLAN-Koexistenz separat |
 | LN882H | Kein dokumentiertes IEEE-802.15.4-Funkmodul | WLAN-Hardware grundsätzlich passend; Port offen | IPv6 durch ESPHome/LibreTiny durchgängig nutzbar machen |
 | RTL8720C | Kein dokumentiertes IEEE-802.15.4-Funkmodul | WLAN-Hardware grundsätzlich passend; Port offen | IPv6, knapper RAM und genaue CF/CM-/Flashvariante |
 
@@ -65,7 +65,7 @@ jedoch wegen des SDK-Hängers bei WLAN-STA-Aktivierung mit BLE. Physisch vorhand
 BLE ist deshalb noch keine fertige Matter-BLE-Provisionierung. Die Minimalprofile
 lassen ESPHome unbenutztes BLE abschalten.
 
-Eine weitere konkrete Lücke ist die Entropieanbindung:
+Die Entropieanbindung braucht wegen folgender SDK-Eigenschaften besondere Sorgfalt:
 
 - [LibreTinys `lt_rand_bytes()`][random] verwendet `rand()`.
 - BDK 3.0.33 verwendet im [mbedTLS-Hardwareadapter][old-entropy] ebenfalls `rand()`.
@@ -75,9 +75,11 @@ Eine weitere konkrete Lücke ist die Entropieanbindung:
   dort ersetzt ein passender Funktionsname keine Prüfung von Initialisierung,
   Fehlerfällen und Entropiequalität.
 
-Diese Wege dürfen nicht ungeprüft als kryptografische Entropie für PASE/CASE oder
-Geräteschlüssel verwendet werden. Vor einem sicheren Matter-Prototyp braucht es
-eine begrenzte, fehlerprüfende TRNG-Anbindung mit DRBG und passenden Tests.
+Der native Server verwendet deshalb direkt den TRNG-Geräteaufruf, wortweise und
+mit Fehler-/Wiederholungskontrolle. Hosttests prüfen volle Puffer, Grenzen und
+Fehlerfälle. Er verwendet keinen rand()-Fallback. Die tatsächliche Entropiequalität
+und Initialisierung auf Beken-Hardware sind weiterhin zu prüfen. Protokoll- und
+Kryptoverfahren stammen aus rs-matter/RustCrypto.
 
 ## Wiederverwendung von ESPHome
 
@@ -103,8 +105,9 @@ und RTL87xx fehlt die entsprechende Freigabe. Diese Beschränkung ist eine Aussa
 Der aussichtsreichste Weg für unveränderte Geräte ist ein schlanker, nativer
 Matter-over-Wi-Fi-Port mit zunächst einem On/Off-Endpunkt und Provisionierung
 über das vorhandene LAN. BK7231N bleibt Hauptziel; BK7238/T1 dient parallel als
-Referenz zum veröffentlichten SDK. Ein verbindliches „passt und läuft“ wäre vor
-einem verlinkten CHIP-Server und Messungen während PASE/CASE nicht belastbar.
+zweites Buildziel. Der Server passt in beide regulären Apppartitionen und koppelt
+sich auf dem Host mit einem unabhängigen CHIP-Controller. Ein verbindliches
+„läuft auf dem Gerät“ benötigt weiterhin Messungen während PASE/CASE auf ARM9.
 
 Eine externe lokale Matter-Bridge könnte ESPHome-Geräte ebenfalls in mehrere
 Ökosysteme einbinden, würde aber zusätzliche laufende Infrastruktur verlangen.

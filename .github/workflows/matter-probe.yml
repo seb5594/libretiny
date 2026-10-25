@@ -33,7 +33,7 @@ jobs:
         working-directory: .
         run: isort --profile black . --check-only
       - run: ruff check components tools tests
-      - run: clang-format --dry-run --Werror components/libretiny_matter_probe/*.h components/libretiny_matter_probe/*.cpp components/libretiny_matter_storage/*.h components/libretiny_matter_storage/*.cpp components/libretiny_matter_protocol/*.h components/libretiny_matter_protocol/*.cpp tests/storage/*.h tests/storage/*.cpp tests/protocol_cli.cpp
+      - run: clang-format --dry-run --Werror components/libretiny_matter_probe/*.h components/libretiny_matter_probe/*.cpp components/libretiny_matter_storage/*.h components/libretiny_matter_storage/*.cpp components/libretiny_matter_protocol/*.h components/libretiny_matter_protocol/*.cpp components/libretiny_matter_server/*.h components/libretiny_matter_server/*.cpp tests/storage/*.h tests/storage/*.cpp tests/server/*.h tests/server/*.cpp tests/protocol_cli.cpp
       - run: esphome compile tests/host.yaml
       - run: esphome compile tests/protocol-host.yaml
       - run: python tools/fetch_flashdb.py
@@ -44,12 +44,55 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        board: [bk7231n, bk7238-t1, ln882h, rtl8720cf, bk7231n-storage, bk7238-t1-storage, bk7231n-protocol, bk7238-t1-protocol, ln882h-protocol, rtl8720cf-protocol]
+        board: [bk7231n, bk7238-t1, ln882h, rtl8720cf, bk7231n-storage, bk7238-t1-storage, bk7231n-protocol, bk7238-t1-protocol, ln882h-protocol, rtl8720cf-protocol, bk7231n-matter, bk7238-t1-matter, bk7231n-matter-existing, bk7238-t1-matter-existing]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - run: pip install -r requirements-dev.txt
+      - name: Install pinned Rust toolchain for the native Matter server
+        if: contains(matrix.board, '-matter')
+        run: rustup toolchain install nightly-2026-10-24 --profile minimal --component rust-src,rustfmt
+      - uses: actions/cache@v4
+        if: contains(matrix.board, '-matter')
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: cargo-${{ runner.os }}-${{ hashFiles('experiments/esphome-matter/components/libretiny_matter_server/rust/Cargo.lock') }}
       - run: cp examples/secrets.yaml.example examples/secrets.yaml
       - run: esphome compile examples/${{ matrix.board }}.yaml
+
+  interoperability:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r tests/server/requirements.txt
+      - run: sudo apt-get update && sudo apt-get install -y libnl-route-3-200 libglib2.0-0t64
+      - name: Prepare isolated runner's controller settings directory
+        run: sudo install -d -m 0777 /data
+      - run: rustup toolchain install nightly-2026-10-24 --profile minimal --component rust-src,rustfmt
+      - name: Check Rust formatting
+        working-directory: experiments/esphome-matter/components/libretiny_matter_server/rust
+        run: cargo fmt --check
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: cargo-${{ runner.os }}-${{ hashFiles('experiments/esphome-matter/components/libretiny_matter_server/rust/Cargo.lock') }}
+      - run: python tools/fetch_flashdb.py
+      - run: python tools/build_matter_host.py --build-dir .cache/server-build
+      - name: Pair, operate, reboot and inject failures using the independent CHIP controller
+        run: |
+          TEST_IPV4=$(ip -4 route get 1.1.1.1 | sed -n 's/.* src \([^ ]*\).*/\1/p')
+          python tools/test_matter_server.py --binary .cache/server-build/matter-host --build-dir .cache/server-interop --ipv4 "$TEST_IPV4"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: matter-interoperability-summary
+          path: experiments/esphome-matter/.cache/server-interop/summary.json

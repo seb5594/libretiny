@@ -1,159 +1,96 @@
-# ESPHome / LibreTiny: Vorbereitung für Matter über WLAN
+# Matter über WLAN für ESPHome und LibreTiny
 
-**Stand: Experiment, kein Matter-Server.** Dieses Verzeichnis enthält eine
-kompilierbare ESPHome External Components, vier Diagnoseprofile, zwei Beken-Profile
-mit nativem Matter-Speicheradapter, vier Protokolltestprofile, einen IPv6-Testclient
-und Tests. Es implementiert noch kein Pairing, keinen Cluster-Server und kein Zigbee.
+**Nativer Entwicklungsserver für BK7231N und BK7238/Tuya T1.**
+`libretiny_matter_server` verbindet den Project-CHIP-Stack **rs-matter** mit
+ESPHome, LibreTiny, FreeRTOS, lwIP und der vorhandenen FlashDB. Ein virtueller
+On/Off-Licht-Endpunkt lässt sich mit einem unabhängigen ConnectedHomeIP-Controller
+koppeln, schalten, lesen und abonnieren. Fabric und Schaltzustand überleben
+Neustarts. Die Firmware verwendet die **offizielle LibreTiny-Version 1.14.0**.
 
-Ziel bleibt ein nativer Matter-Port für **BK7231N zuerst, BK7238/Tuya T1 danach**.
-LibreTiny bleibt die Buildplattform. LN882H und RTL8720C sind weitere Kandidaten.
-Die Ergebnisse und die noch fehlenden Teile sind in
-[Machbarkeit](docs/feasibility.md), [Architektur](docs/architecture.md) und
-[Prüfergebnisse](docs/validation.md) beschrieben.
+**Auf echter Beken-Hardware noch nicht ausgeführt.** Host-Interoperabilität,
+MCU-Build und simulierte Plattformtests sind belegt; Funkbetrieb, tatsächlicher
+Heap-/Stack-Spitzenbedarf und PASE-Laufzeit auf ARM9 benötigen UART-Messungen.
+Das ist ein konkreter Testkandidat, kein zertifiziertes oder fertig vermessenes Produkt.
 
-## Was bereits funktioniert
+## Einstieg
 
-- Originale CHIP-TLV- und Interaction-Model-Codecs erzeugen und lesen On/Off-
-  Aufrufnutzdaten. Ein Selbsttest mit 72 Prüfungen lässt sich als Package in
-  vorhandene ESPHome-Geräte mit offizieller LibreTiny-Plattform aufnehmen:
-  **[Anleitung und Testbeispiel](docs/protocol-tests.md)**. Das ist noch kein
-  Matter-Netzwerkendpunkt; es werden keine Gerätefunktionen ausgelöst.
-- Der neue `libretiny_matter_storage`-Adapter implementiert die originale
-  `chip::PersistentStorageDelegate`-Schnittstelle über LibreTinys bestehende FlashDB.
-  Schlüssel bleiben vollständig erhalten; Binärwerte, leere Werte, Teil-Lesezugriffe,
-  Löschung, volle Partition und Persistenz nach Prozessneustart sind getestet.
-  Aufbau, Grenzen und Nutzung: [Matter-Speicheradapter](docs/storage.md).
-- ESPHome validiert die Konfiguration und erzeugt Firmware über LibreTiny.
-- Auf BK7231N und BK7238/T1 wird IPv6 einkompiliert. Die Komponente kann auf einem
-  Testgerät einen nicht blockierenden UDP-Echo-Endpunkt öffnen und der experimentellen
-  IPv6-Multicastgruppe `ff02::114` beitreten.
-- Logs melden IPv6-Adressen, Heap, kleinsten freien Heap seit Start, größten freien
-  Block (soweit vom SDK gemeldet) sowie empfangene/gesendete Testpakete. LibreTinys
-  Standardimplementierung der Blockgrößenabfrage liefert null; das wird ausdrücklich
-  als `unavailable` ausgegeben und nicht als gemessener Speichermangel interpretiert.
-- Derselbe C++-Code wird als ESPHome-Hostprogramm gebaut und über echte IPv6-Sockets
-  getestet. Das ersetzt keinen Test der Beken-Funktreiber.
-- LN882H/RTL8720CF liefern zunächst eine IPv4-/Speicher-Baseline. Die
-  IPv6-Freigabe dieser Familien fehlt in ESPHome 2026.10.0.
+- **[Bauen, in bestehende Geräte einbinden und koppeln](docs/matter-server.md)**
+- [Architektur und Wiederverwendung](docs/architecture.md)
+- [Prüfergebnisse und Grenzen](docs/validation.md)
+- [Hardware-Machbarkeit, Zigbee/BLE und Quellen](docs/feasibility.md)
 
-Die Komponente verwendet ESPHomes `network`, `socket` und `PollingComponent` sowie
-LibreTinys vorhandene Heap-APIs. Der Paketpfad verarbeitet höchstens ein Datagramm
-pro 20 ms, nutzt einen festen 21-Byte-Puffer und erzeugt keine eigene dynamische
-Paketwarteschlange. Diese Begrenzung macht die gemessene Latenz ausdrücklich
-**nicht** zu einem maximalen Durchsatz- oder Matter-Latenzbenchmark.
+BK7231N hat Priorität. BK7238/T1 wird mit demselben Backend gebaut. LN882H und
+RTL8720CF haben Diagnose-/Codec-Profile; der native Server ist für diese Plattformen
+noch nicht freigegeben. BLE ersetzt keine IEEE-802.15.4-Hardware: Zigbee und
+Matter-over-Thread sind mit den untersuchten Funkmodulen nicht implementierbar.
+Matter-over-Wi-Fi benötigt BLE nicht für den laufenden Betrieb; dieser Port richtet
+sich über ein **bereits von ESPHome eingerichtetes WLAN** ein.
 
-## Lokal bauen
+## Komponenten
 
-Python 3.12 und eine C++-Toolchain für die Hosttests installieren. Im Repository:
+| Komponente | Aufgabe |
+| --- | --- |
+| `libretiny_matter_server` | PASE, CASE, Attestation mit Testzertifikaten, Fabric/ACL, Interaction Model, mDNS, MRP, virtueller On/Off-Endpunkt und Subscriptions über rs-matter |
+| `libretiny_matter_storage` | Gemeinsamer FlashDB-Speicher; CHIP-Delegate und synchronisierte Anbindung des Matter-Workers |
+| `libretiny_matter` | Unveränderte C++-CHIP-Header/Codecs für Speichervertrag und unabhängige Codec-Tests |
+| `libretiny_matter_protocol` | [72 lokale Codec-Selbstprüfungen](docs/protocol-tests.md), optional auf vorhandenen Geräten |
+| `libretiny_matter_probe` | IPv6-Unicast-/Multicastdiagnose, Heap-Logs, eigenes `LTM1`-Echo auf UDP/49152 |
+
+Das On/Off-Licht verwendet **keine GPIOs und keine vorhandenen Relais**. Die
+Zuordnung zu echten ESPHome-Entities ist noch offen. Das Matter-WLAN-Cluster kann
+den bestehenden Netzstatus melden; Scan und Wechsel der WLAN-Zugangsdaten werden
+explizit abgewiesen. BLE-Provisionierung, Matter-OTA, Multi-Fabric-Belastungstests,
+Produktzertifikate und ein benutzerseitiger Matter-Resetknopf fehlen noch.
+ESPHome-API/OTA lassen sich weiterhin über IP nutzen; ESPHomes eigener mDNS-Responder
+muss für diesen Stand abgeschaltet sein.
+
+## Schnell bauen
+
+Linux x86_64, Python 3.12, C/C++-Compiler und Rustup installieren. Den Rustup-Installer
+von [rust-lang.org](https://www.rust-lang.org/tools/install) verwenden, falls nötig.
+Für den ersten Rust-Build mindestens ungefähr 6 GiB verfügbaren RAM einplanen.
 
 ```sh
 cd experiments/esphome-matter
 python3 -m venv .venv
 . .venv/bin/activate
 pip install -r requirements-dev.txt
+rustup toolchain install nightly-2026-10-24 --profile minimal --component rust-src,rustfmt
 cp examples/secrets.yaml.example examples/secrets.yaml
-# In secrets.yaml die WLAN-Daten des Testnetzes eintragen.
-esphome compile examples/bk7231n.yaml
-esphome compile examples/bk7238-t1.yaml
-# Dieselben Boards mit dem nativen CHIP-Speicheradapter:
-esphome compile examples/bk7231n-storage.yaml
-esphome compile examples/bk7238-t1-storage.yaml
+# WLAN-Zugangsdaten in examples/secrets.yaml eintragen.
+esphome compile examples/bk7231n-matter.yaml
+esphome compile examples/bk7238-t1-matter.yaml
 ```
 
-Für die weiteren Familien:
+Das PlatformIO-Skript baut die gepinnte Rust-Bibliothek für `thumbv5te-none-eabi`
+und verlinkt sie in die normale LibreTiny-Firmware. Kein anderer Bootloader,
+keine geänderte Partitionstabelle und keine Binärbibliothek eines fremden Matter-SDKs.
+Der erste Build lädt Cargo-Abhängigkeiten und dauert einige Minuten. Bei mehreren
+Buildprofilen kann `LTM_CARGO_TARGET_DIR` auf ein gemeinsames absolutes Cache-Verzeichnis
+zeigen. Standardmäßig ist Rust auf einen Compilerjob begrenzt.
+
+Für API und OTA zusätzlich gibt es `bk7231n-matter-existing.yaml` und
+`bk7238-t1-matter-existing.yaml`. Die Beispielprofile sind generisch und ersetzen
+beim Flashen die bisherige Geräteanwendung. Vor einem UART-Test das tatsächliche
+Modul/Flashlayout prüfen und ein vollständiges Backup einschließlich RF-Daten anlegen.
+Ein Netzspannungsgerät nur spannungsfrei und mit passender isolierter Versorgung testen.
+
+## Tests reproduzieren
 
 ```sh
-esphome compile examples/ln882h.yaml
-esphome compile examples/rtl8720cf.yaml
-```
-
-Die Profile pinnen deinen LibreTiny-Fork auf den untersuchten Commit. Sie verwenden
-keine veränderten Bootloader- oder Flashpartitionen. Die Messfirmware konfiguriert
-keine Relais/GPIOs, keine ESPHome-API, keinen Webserver und kein OTA. Sie ersetzt
-beim Flashen die bisherige Geräteanwendung und ist für einen UART-Testaufbau gedacht.
-Vor dem Test das vorhandene Image einschließlich Kalibrierungsdaten sichern und
-das tatsächliche Modulprofil prüfen. Ein Netzspannungsgerät nur spannungsfrei und
-über eine passende, isolierte Niederspannungsversorgung am UART testen.
-
-Die erzeugte `firmware.uf2` mit den üblichen LibreTiny-/ltchiptool-Werkzeugen
-flashen; **keine Binärdatei des fremden Matter-SDKs auf ein Tuya-T1-Modul schreiben**.
-Die Beispiel-Zugangsdaten sind Platzhalter, auch in CI-Builds.
-
-## IPv6 auf BK7231N oder T1 messen
-
-1. Boot- und WLAN-Logs über UART aufzeichnen. Eine Adresse `fe80::...` genügt für
-   einen Test im selben LAN; ein IPv6-Internetzugang ist dafür nicht erforderlich.
-2. Auf einem Rechner im selben LAN testen (Interface anpassen):
-
-   ```sh
-   python tools/check_udp.py 'fe80::1234%wlan0' --count 20
-   python tools/check_udp.py ff02::114 --interface wlan0 --count 5
-   ```
-
-3. Nach WLAN-Unterbrechung und Neustart wiederholen. Für spätere Speichervergleiche
-   insbesondere `heap_free`, `heap_min` und `heap_max_block` nach dem WLAN-Start und
-   nach mindestens 30 Minuten erfassen.
-
-Der Client gibt JSON aus und liefert Exitcode 0 nur, wenn jede Anfrage mindestens
-eine passende Antwort erhielt. Beim Multicasttest können mehrere Testgeräte antworten.
-Die Interface-Nummer im Client bezeichnet **den Rechner**, nicht die MCU.
-`multicast_joined=YES` im Firmwarelog bestätigt nur die lokale Gruppenanmeldung;
-erst eine Antwort auf den Multicasttest belegt die Übertragung durch das WLAN.
-AP-Isolation und Multicastfilter können diesen Test beeinflussen.
-
-Das Protokoll ist ausschließlich `LTM1` plus 16 zufällige Bytes, zurückgesendet
-ohne Verlängerung. Es verwendet UDP-Port 49152, nicht den Matter-Port 5540.
-Es prüft keine Matter-Nachrichten, mDNS-Dienste oder kryptografischen Sitzungen.
-
-## In vorhandener ESPHome-Konfiguration verwenden
-
-```yaml
-external_components:
-  - source:
-      type: local
-      path: /pfad/zu/libretiny/experiments/esphome-matter/components
-    components: [libretiny_matter_probe]
-
-# IPv6 derzeit nur für die Beken-Testprofile aktivieren.
-network:
-  enable_ipv6: true
-  min_ipv6_addr_count: 0
-
-libretiny_matter_probe:
-  udp_echo: true
-  port: 49152
-  interface_index: 0
-  update_interval: 30s
-```
-
-`udp_echo` ist standardmäßig ausgeschaltet. Mit `false` bleibt nur die Diagnose.
-`interface_index: 0` lässt lwIP das Standardinterface für Multicast wählen; bei
-Bedarf kann ein bekannter MCU-Interfaceindex angegeben werden. Die Komponente
-leitet daraus keine Aussage „Matter-fähig“ ab.
-
-Die Testprofile setzen `min_ipv6_addr_count: 0`, damit ein fehlgeschlagener
-IPv6-Adressaufbau beobachtbar bleibt und den allgemeinen Verbindungsstatus nicht
-blockiert. Ein späterer Matter-Server muss selbst auf eine brauchbare IPv6-Adresse
-warten. Für Vergleiche mit einer bestehenden Geräteanwendung die Komponente dort
-ergänzen; die Minimalfirmware misst deren zusätzlichen Speicherverbrauch nicht.
-
-## Entwicklung prüfen
-
-```sh
-ruff check components tools tests
-autoflake -r --check --remove-unused-variables components tools tests
-black --check components tools tests
-(cd ../.. && isort --profile black . --check-only)
-clang-format --dry-run --Werror components/libretiny_matter_probe/*.h components/libretiny_matter_probe/*.cpp components/libretiny_matter_storage/*.h components/libretiny_matter_storage/*.cpp components/libretiny_matter_protocol/*.h components/libretiny_matter_protocol/*.cpp tests/storage/*.h tests/storage/*.cpp tests/protocol_cli.cpp
 esphome compile tests/host.yaml
 esphome compile tests/protocol-host.yaml
 python tools/fetch_flashdb.py
 pytest -q
 ```
 
-Die GitHub-Actions-Datei `matter-probe.yml` führt Hosttests und zehn Firmwarebuilds
-aus. [Prüfergebnisse](docs/validation.md) trennen lokale Builds, Hosttests und die
-noch ausstehenden Messungen auf echter Hardware.
+Die vollständigen Matter-Netzwerktests verwenden einen **unabhängigen C++-Controller**,
+die identische Rust-Serverbibliothek, den identischen UDP-Adapter und echte FlashDB
+auf einem NOR-Simulator. Einrichtung und Aufruf stehen in
+[der Serveranleitung](docs/matter-server.md#unabhängige-interoperabilitätstests).
+GitHub Actions führt die Hosttests, diese Interoperabilitätstests und 14 Firmwareprofile
+aus. Controller-Zugangsdaten und simulierte Flashabbilder werden nicht veröffentlicht.
 
-Dieses Verzeichnis kann später als separates Komponenten-Repository ausgegliedert
-werden. Für diesen ersten Stand wird kein weiteres Repository benötigt.
+Die getrennten Diagnoseprofile `bk7231n.yaml`, `bk7238-t1.yaml`, `ln882h.yaml` und
+`rtl8720cf.yaml` bleiben verfügbar. Bei Beken kann `tools/check_udp.py` das
+Diagnose-Echo über IPv6 testen; dieses Echo ist unabhängig vom Matter-Protokoll.

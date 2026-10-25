@@ -1,5 +1,8 @@
 # Matter-Nachrichten auf vorhandenen ESPHome-Geräten testen
 
+Dieser Abschnitt beschreibt die separaten Codec-Selbsttests. Für den inzwischen
+implementierten Netzwerkserver mit Pairing siehe [Matter-Server](matter-server.md).
+
 Die Komponente `libretiny_matter_protocol` baut originale Matter-Codecs unter
 LibreTiny und führt dieselben 72 Prüfungen auf dem Host und auf der MCU aus.
 Sie erzeugt und liest echte **Interaction-Model-Nutzdaten für Off, On und Toggle**

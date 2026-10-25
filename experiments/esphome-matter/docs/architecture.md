@@ -1,101 +1,90 @@
-# Zielarchitektur und nachprüfbare Meilensteine
+# Architektur des nativen Matter-Ports
 
-Diagnosekomponente, nativer FlashDB-Adapter und originale CHIP-Codecs für TLV und
-InvokeRequest-Nutzdaten sind eingebunden. Die Codecs sind auf dem Host getestet
-und als Selbsttest auf den Ziel-MCUs baubar. Die übrigen Schichten sind geplant;
-es gibt noch keinen Matter-Server.
-
-## Grenzen der Schichten
+Die aktive Serverimplementierung verwendet **Project CHIP rs-matter** statt einen
+ESP-IDF-Port oder die fremde BK7238-SDK-Firmware. Protokoll, Kryptografie und
+Clusterzustände stammen aus dem gepinnten Upstream. Die Plattformanbindung ist klein
+und getrennt von ESPHomes Python-Schema und dem Matter-Datenmodell.
 
 ```text
-ESPHome-YAML und vorhandene Entities (switch/light/sensor)
+ESPHome YAML -> Validierung / Codegen
     |
-    v
-gemeinsames Matter-Schema und Endpoint-/Cluster-Zuordnung
+MatterServer: ESPHome-Mainloop
+    |-- bestehendes WLAN und IPv6 / Adressänderungen
+    |-- FlashDB-Delegate im selben Task wie ESPHome-Preferences
+    |-- Queue (1 Request) + Semaphore
     |
-    v
-Matter-Backend / connectedhomeip
-    |
-    v
-LibreTiny-Plattformanbindung
-    |-- Zeit, Task und Synchronisation -> vorhandenes FreeRTOS
-    |-- IPv6, UDP, Multicast           -> vorhandenes lwIP
-    |-- Wi-Fi-Ereignisse               -> ESPHome / LibreTiny
-    |-- persistente Fabric-Daten       -> geprüfter FlashDB/KVS-Adapter
-    |-- Entropie und Crypto            -> geprüfter TRNG-/mbedTLS-Adapter
-    `-- Board/Partitionen              -> LibreTiny-Profil
+FreeRTOS-Matter-Worker (24 KiB Stack, Priorität 1)
+    |-- C ABI: TRNG, Zeit, Allocator, Logs, Storage, UDP
+    |-- rs-matter: PASE/CASE, MRP, Fabric/ACL, Interaction Model
+    |-- Root-Endpoint: WLAN-Diagnose, Administration, Attestation
+    `-- Endpoint 1: Descriptor, Identify, Groups, OnOff-Licht
 ```
 
-Das gemeinsame Python-Schema soll wie ESPHomes Zigbee-Integration beim Generieren
-des Codes das Backend auswählen. Entity-Zuordnung und Validierung gehören nicht
-in `#ifdef BK7231N`-Blöcke. SDK-Unterschiede von BK7231N und BK7238 werden unterhalb
-des Backends gekapselt. Erweiterungen für LN882H/RTL8720C folgen derselben Grenze.
+Der Server berührt keine GPIOs. Der virtuelle OnOff-Zustand wird unter einer
+Critical Section an den Mainloop übergeben. Eine spätere Entity-Zuordnung gehört
+in diese ESPHome-Schicht; netzwerkspezifische Details gehören weiter hinter die C ABI.
+Das entspricht der Trennung gemeinsamer Konfiguration und Plattformbackends in
+ESPHomes Zigbee-Komponente, ohne deren nicht austauschbares Funkprotokoll zu kopieren.
 
-Die vorhandene `esp-matter`-Komponente kann als Referenz für das Datenmodell
-dienen. Ihren ESP-IDF-Unterbau unverändert in LibreTiny zu kompilieren ist kein
-tragfähiger Integrationsweg. Wiederverwendbarer Code wird erst nach Prüfung seiner
-Lizenz und tatsächlichen Plattformabhängigkeiten übernommen. Cryptografie,
-PASE/CASE, TLV und das Interaction Model werden nicht neu erfunden.
+## Plattformvertrag
 
-## Meilensteine
+- ESPHome besitzt WLAN-Zugangsdaten und Reconnect. Der Server wartet auf gültiges IPv6.
+  Adressänderungen beenden laufende Sessions; der Stack startet mit gespeicherten
+  Fabrics neu. Matter-WLAN-Scan/Netzwechsel werden explizit abgelehnt.
+- Zwei nicht blockierende Dualstack-UDP-Sockets: Matter 5540 und mDNS 5353.
+  Receive-Buffer begrenzt, übergroße Pakete verworfen, keine zusätzliche Paketqueue.
+  Der Rust-Empfänger gibt zwischen Datagrammen an den Executor zurück. Dieser pollt
+  alle 10 ms; Send-Wiederholungen bei `EAGAIN` sind begrenzt.
+- Eine einplatzige Queue übergibt Speicheraufträge vom Worker an den ESPHome-Mainloop.
+  Der Worker wartet bis zur Bestätigung, damit kein auslaufender Stackpointer im
+  Mainloop verbleibt. Alle gemeinsamen FlashDB-Zugriffe bleiben im Mainloop.
+- FlashDB verwendet vorhandene Partition und Schlüssel `matter/rs/xxxx`, bis 2 KiB
+  pro Wert. Der bereits geprüfte C++-CHIP-Delegate wird wiederverwendet.
+  Keine separate ungeprüfte KV-Implementierung; keine neue Flashpartition.
+- Entropie über Beken `sddev_control(IRDA_DEV_NAME, TRNG_CMD_GET, ...)`, wortweise mit
+  Fehlerkontrolle. Drei identische aufeinanderfolgende Wörter stoppen Matter.
+  Dieser Kontinuitätstest ist keine Entropiezertifizierung. Der alte BDK-Bytehelper
+  und `lt_rand_bytes()`/`rand()` werden nicht für Matter verwendet.
+- FreeRTOS übernimmt Heap und Critical Sections. Die Uhr erweitert den
+  Millisekundenzähler über Wraparound. Rust-Panics/Entropiefehler stoppen den Worker;
+  ESPHome bleibt aktiv. Das stellt keinen Schutz gegen Hardware-Stacküberläufe dar.
+- Statische Protokollzustände werden direkt am Zielort initialisiert. Große temporäre
+  Stackkopien werden vermieden. Warmstop droppt den Future vor den geliehenen
+  Protokollzuständen; init/poll/stop laufen ausschließlich im selben Worker.
 
-| Schritt | Umsetzung | Nachweis für Abschluss |
-| --- | --- | --- |
-| 0 — vorhanden | Diagnosekomponente, LibreTiny-Builds, IPv6-Client, Hosttests | Lokale Ergebnisse in `validation.md`; Hardwaremessungen noch offen |
-| 0a — vorhanden | CHIP-Speicherschnittstelle auf bestehender ESPHome-FlashDB, Beken-Builds | [Speicheradapter](storage.md): Vertrag, Fehlerfälle und Prozessneustart mit echter FlashDB getestet; Hardware-Stromausfalltest offen |
-| 0b — vorhanden | Native CHIP-TLV-/InvokeRequest-Codecs und Selbsttest-Package für bestehende Geräte | [Protokolltests](protocol-tests.md): feste Bytevektoren, Grenzfälle, Sanitizer, begrenztes Fuzzing; MCU-Laufzeitlogs offen |
-| 1 | Beken-IPv6 einschließlich mDNS/Multicast und Speicher erfassen | UART-Logs, Unicast-/Multicastantworten, WLAN-Reconnect, Langzeitlauf auf N und T1 |
-| 2 | CHIP mit ARMv5TE-Toolchain in LibreTiny einbinden; Entropie, Zeit, KVS und Task anbinden | Verlinkter Server, nachvollziehbare Lizenz-/Versionsliste, getestete Entropiefehler und persistente Fabric-Daten |
-| 3 | Ein On/Off-Endpunkt, vorhandenes WLAN, kleiner begrenzter Ressourcenbedarf | Pairing, On/Off, Attribute-Read/Subscribe, Reboot und Wiederverbindung mit einem Controller |
-| 4 | Mehrere Fabrics und Ressourcenoptimierung | Zweiter Controller, Rechteprüfung, gleichzeitige Subscriptions, gemessene PASE-/CASE-Spitzen und keine Speicherlecks |
-| 5 | Weitere Entities, Aktualisierungspfad, optionale BLE-Einrichtung | Gerätetypentests, unterbrochene Updates, konsistenter Factory Reset; T1-BLE separat nachweisen |
+## Reproduzierbare Abhängigkeiten
 
-Für Schritt 2 ist ein eigener `platform/libretiny`-Adapter sinnvoll, der den
-passenden Beken-Code wiederverwendet. Der offizielle Beken-Port und das ARM-SDK
-sind unterschiedliche Integrationsbasen und müssen anhand einer festgelegten
-CHIP-Version verglichen werden. Ein pauschaler Austausch von ESP-IDF-Includes
-oder ein ungetesteter Backend-Stub wäre kein fertiggestellter Schritt.
+`rs-matter` 0.4.1, Commit `7195e2b1f45df94ee1bc63605b7db91a6878b9dc`,
+Apache-2.0, implementiert Matter-1.6-Schemata. Der getestete Controller ist
+ConnectedHomeIP aus `home-assistant-chip-core/clusters==2025.7.0`.
+Nightly-Rust `2026-10-24` baut `core`/`alloc` für `thumbv5te-none-eabi`.
+`Cargo.lock` pinnt transitive Abhängigkeiten; `cargo --locked` verhindert stille Updates.
 
-Der vorhandene Speicheradapter ist ein Teil von Schritt 2, kein Abschluss davon.
-Er erlaubt Zugriffe nur aus dem ESPHome-Haupttask. Bevor ein CHIP-Worker eingeführt
-wird, muss die gemeinsame Datenbank über alle Leser/Schreiber hinweg synchronisiert
-werden. Ein Mutex nur um die drei neuen Delegate-Methoden würde ESPHomes vorhandene
-Preferences-Zugriffe nicht schützen.
+Zwei eng begrenzte lokale Upstream-Anpassungen liegen unter `rust/vendor`:
 
-## Regeln für den nativen Port
+1. `embassy-sync` verwendet in `LazyLock`/`OnceLock` portable atomics statt der auf
+   ARMv5TE fehlenden Core-Atomics. Critical Sections kommen aus FreeRTOS.
+2. `rs-matter-codegen` erzeugt nur die 53 von den kompilierten Modulen referenzierten
+   Clusterdeklarationen. Alle genutzten Felder/Kommandos bleiben unverändert. Ohne
+   Filter erzeugt Upstream über 30 MB Rust und überschreitet das Compiler-RAM-Budget.
 
-- ESPHome besitzt den WLAN-Lebenszyklus. CHIP darf ihn nicht zusätzlich aus
-  einer eigenen Beispielanwendung initialisieren oder zurücksetzen.
-- CHIP-Callbacks und ESPHome-Mainloop müssen sich Zustandsänderungen über einen
-  klar definierten, begrenzten Mechanismus übergeben. Keine GPIO-Aktionen direkt
-  aus fremden Tasks und keine Flashoperationen in Netzwerkcallbacks.
-- Fabric-Daten werden mit vollständigen Schlüsseln und geprüfter Persistenz
-  gespeichert. Eine nur gehashte ESPHome-Preference-ID reicht als allgemeiner
-  Matter-Key-Value-Store nicht. Stromausfall, volle Partition, Löschen und
-  Teil-Lesezugriffe benötigen Tests.
-- Initiale Einrichtung über das bestehende LAN; ein begrenztes Commissioning-
-  Fenster. Nach erfolgreicher Einrichtung bleiben Fabric-Daten über Neustarts
-  erhalten. Multi-Admin, erneute Freigabe und Factory Reset werden ausdrücklich
-  implementiert, nicht durch „beim Start alles löschen“ ersetzt.
-- Test-VID/PID und Entwicklungszertifikate sind für den Laborprototyp zu markieren.
-  Ein Produkt benötigt eigene Attestation-/Provisioning-Prozesse und die jeweils
-  erforderliche Konformitätsprüfung. Keine echten privaten Geräteschlüssel ins Repo.
-- Für das knappe Beken-Budget zunächst nur benötigte Gerätetypen und Cluster
-  einbinden. BLE, umfangreiche Logs, Webserver und zusätzliche APIs getrennt
-  vermessen. Linker-Garbage-Collection und freigegebene Optimierung nutzen; die
-  LibreTiny-Warnung vor beliebigen Änderungen an der SDK-Optimierungsstufe beachten.
-- OTA-Speicher und Wiederherstellbarkeit bleiben Teil des Budgets. Eine größere
-  Apppartition ist keine kostenlose Performanceoptimierung. Die T1-RF-Daten
-  dürfen keinesfalls mit den Offsets eines anderen SDKs überschrieben werden.
+Manifestdateien dokumentieren Originalchecksummen und geänderte Dateien. Tests
+prüfen unveränderte Dateien. Lizenzen bleiben erhalten. Kryptografische Algorithmen
+und Protokollimplementierungen wurden nicht lokal neu geschrieben.
 
-## Performance-Messung
+## Nachweis und verbleibende Arbeit
 
-Pro Board und Buildprofil erfassen: Flashbelegung, statische RAM-Segmente,
-Task-Stack-Maxima, freier/minimaler Heap, größter freier Block, Zeit für PASE und
-CASE, Befehlslatenz (Median/p95/p99), Reconnectdauer und Verbrauch über 24 Stunden.
-Das ursprüngliche Geräteprofil und die Minimalfirmware werden getrennt verglichen.
-Alle Angaben benötigen die Softwareversionen und das konkrete Modul.
+Softwareseitig nachgewiesen: sichere Kopplung, Attestation mit öffentlichen
+Testzertifikaten, NOC/Fabric-Persistenz, CASE nach Neustart, OnOff/Read/Subscribe,
+ACL-Verweigerung, ungültige Pakete, Speicher-/Entropiefehler, Warmstart und Builds
+für beide Beken-Ziele, einschließlich API/OTA-Vergleichsprofilen.
 
-Ein Budgetentscheid fällt anhand der höchsten beobachteten Laufzeitlast plus
-Reserve. Erfolgreiche Hosttests und ein kleiner Minimalbuild alleine erlauben
-keine Aussage über den Platzbedarf eines vollständigen Matter-Geräts.
+Noch offen: tatsächlicher Beken-Funkbetrieb und Ressourcenmessung, physischer
+Stromausfall beim Flashen, Multi-Fabric-/Gruppenlast, mehrere gleichzeitige
+Subscriptions, Produkt-Attestation, Entity-Mapping, benutzerseitiger Reset und
+optionales BLE-Provisioning. LN882H/RTL8720C brauchen zusätzliche IPv6-/Plattformarbeit.
+
+Performancewerte dürfen erst aus MCU-Messungen abgeleitet werden: Flash, statisches
+RAM, Stack-Minimum, Heap-Minimum, PASE/CASE-Dauer, Befehlslatenz und 24-Stunden-Verlauf.
+Ein erfolgreicher Link beweist weder verbleibenden Laufzeit-Heap noch ausreichende
+ARM9-Kryptografieleistung.

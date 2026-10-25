@@ -1,0 +1,8 @@
+packages:
+  base: !include bk7231n-matter.yaml
+
+esphome:
+  name: matter-bk7238-t1
+
+bk72xx:
+  board: generic-bk7238-tuya

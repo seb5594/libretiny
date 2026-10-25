@@ -63,6 +63,7 @@ def storage_binary(tmp_path_factory):
             "-DCHIP_SYSTEM_CONFIG_USE_SOCKETS=1",
             *includes,
             str(ROOT / "tests/storage/storage_test.cpp"),
+            str(ROOT / "tests/storage/nor_flash.cpp"),
             str(COMPONENT / "flashdb_storage.cpp"),
             *objects,
             "-o",

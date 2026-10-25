@@ -4,8 +4,8 @@
 `FlashDBStorage` erbt direkt von der originalen
 [`chip::PersistentStorageDelegate`](https://github.com/project-chip/connectedhomeip/blob/4b4a3e405882afaf8161c0e4af244e65fa8f3f94/src/lib/core/CHIPPersistentStorageDelegate.h).
 Der Code verwendet echte CHIP-Fehlertypen und FlashDB, keine nachgebildete
-Matter-Schnittstelle. Ein Matter-Server, Commissioning und Fabric-Verwaltung sind
-damit noch nicht vorhanden. Es werden noch keine echten Fabric-Daten erzeugt.
+Matter-Schnittstelle. Der [native Server](matter-server.md) verwendet diesen
+Adapter jetzt für echte Fabric-Zertifikate, Schlüssel und Clusterzustände.
 
 ## Einbindung
 
@@ -27,8 +27,8 @@ nutzt ESPHomes derzeit öffentliches `LibreTinyPreferences::db`; Änderungen die
 Schnittstelle erfordern eine Anpassung. Andere Familien sind noch nicht freigegeben.
 
 `id(matter_storage).get_delegate()` liefert in ESPHome-Lambdas einen
-`chip::PersistentStorageDelegate *`. Später kann der CHIP-Server diesen Delegate
-über seine Initialisierungsparameter erhalten. Der jetzige Stand öffnet beim
+`chip::PersistentStorageDelegate *`. Der rs-matter-Worker nutzt ihn über den
+Mainloop-Dispatcher des Servers. Die Speicherkomponente allein öffnet beim
 Setup nur den Zugang zur bereits initialisierten Datenbank und schreibt dabei
 selbst keine Testwerte. Er initialisiert oder formatiert keine eigene Partition.
 
@@ -59,9 +59,10 @@ Schreibwarteschlange im Adapter.
 
 ESPHome besitzt die Datenbank. Alle Adapterzugriffe müssen im ESPHome-Haupttask
 laufen, der beim Setup erfasst wird. Diese Beschränkung wird zur Laufzeit geprüft.
-CHIP-Aufrufe aus einem separaten Worker sind damit noch nicht unterstützt. Die
-spätere Task-Anbindung muss sowohl CHIP als auch die vorhandenen ESPHome-Zugriffe
-berücksichtigen; nur neue Methoden zu sperren reicht nicht aus.
+Direkte Aufrufe aus einem Worker bleiben gesperrt. Der native Server übergibt
+Aufträge über eine einplatzige Queue an den Mainloop und wartet auf Bestätigung.
+So nutzen auch ESPHomes vorhandene Preferences dieselbe Task-Grenze; ein separater
+Mutex nur für Matter wäre dafür nicht ausreichend.
 
 Nach einem Reset gehört auch die Bindung zum alten Lebenszyklus: Die Komponente
 wird erst beim nächsten Boot neu eingerichtet. `FlashDBStorage` darf nicht erneut
@@ -72,8 +73,9 @@ FlashDB 1.2.0 propagiert Fehler beim Nachschlagen von Metadaten nicht durchgäng
 Ein durch CRC verworfener Eintrag kann deshalb wie ein fehlender Schlüssel wirken.
 Der Adapter prüft ein zurückgegebenes CRC-Ergebnis und den eigentlichen Blob-Read,
 kann aber die fehlende Fehlerunterscheidung des Backends nicht nachträglich
-herstellen. Vor echter Credential-Nutzung sind ein Audit dieser Backendpfade,
-Stromausfalltests und ein abgestimmter Factory-Reset erforderlich. FlashDB bietet
+herstellen. Der Entwicklungsserver speichert bereits Credentials; für belastbaren
+Produktbetrieb fehlen ein Audit dieser Backendpfade, physische Stromausfalltests
+und ein abgestimmter benutzerseitiger Matter-Reset. FlashDB bietet
 hier keine Verschlüsselung ruhender Daten und keine Transaktion über mehrere Keys.
 
 ## Wiederverwendeter Code
@@ -89,10 +91,10 @@ hier keine Verschlüsselung ruhender Daten und keine Transaktion über mehrere K
   Firmware nutzt das vorhandene Framework-Paket; `tools/fetch_flashdb.py` lädt
   denselben Stand für Hosttests. Keine zweite FlashDB wird in die Firmware gelinkt.
 
-Die Quellen werden als lokale PlatformIO-Bibliothek eingebunden. Ein späterer
-vollständiger CHIP-Build muss diese Teilbibliothek ersetzen und überall dieselbe
-CHIP-Version sowie Konfiguration verwenden; zwei verschiedene CHIP-Headerstände
-im selben Programm sind nicht unterstützt.
+Die C++-Quellen werden als lokale PlatformIO-Bibliothek eingebunden. Der Server
+verwendet rs-matter hinter einer schmalen C ABI; er bindet keine zweite C++-CHIP-
+Version ein. Beide Versionen und ihre verschiedenen Aufgaben sind in
+[architecture.md](architecture.md) dokumentiert.
 
 ## Tests und nächster Schritt
 
@@ -110,6 +112,7 @@ pytest -q tests/test_storage.py
 ```
 
 Die Tests ersetzen keinen Stromausfall während eines realen Flashschreibvorgangs.
-Danach folgen die sichere Beken-Entropieanbindung, CHIP-Zeit-/Task-Anbindung und
-ein vollständiger Build des kleinsten On/Off-Servers. Pairing und Controller-
-Interoperabilität werden erst mit diesem Server geprüft.
+Die zusätzlichen Servertests verwenden dieselbe FlashDB und denselben NOR-
+Simulator: Kopplung, echte Fabric-Daten, CASE nach Prozessneustart und Ablehnung
+von CommissioningComplete bei einem injizierten Fabric-Schreibfehler. Diese Tests
+sind in [matter-server.md](matter-server.md) beschrieben.

@@ -1,0 +1,91 @@
+{
+  "controller": "ConnectedHomeIP 2025.7.0",
+  "hardware_tested": false,
+  "stages": [
+    {
+      "stage": "commission",
+      "checks": [
+        "PASS wrong passcode rejected",
+        "PASS commissioning: PASE, attestation, CSR, AddNOC, CASE, complete",
+        "PASS command Off: False",
+        "PASS command On: True",
+        "PASS command Toggle: False",
+        "PASS command Toggle: True",
+        "PASS subscription: changed OnOff attribute reported",
+        "PASS BasicInformation product identity",
+        "PASS WriteAttribute: NodeLabel updated and read back",
+        "PASS WriteAttribute: read-only OnOff attribute rejected",
+        "PASS ACL: authenticated controller without grant rejected",
+        "PASS unsupported endpoint rejected",
+        "PASS malformed UDP: 98 datagrams; authenticated read still works",
+        "PASS persisted-state checkpoint: OnOff=true"
+      ]
+    },
+    {
+      "stage": "reboot",
+      "checks": [
+        "PASS reboot: stored fabric, CASE authentication and OnOff state restored",
+        "PASS command Off: False",
+        "PASS command On: True",
+        "PASS command Toggle: False",
+        "PASS command Toggle: True",
+        "PASS subscription: changed OnOff attribute reported",
+        "PASS BasicInformation product identity",
+        "PASS WriteAttribute: NodeLabel updated and read back",
+        "PASS WriteAttribute: read-only OnOff attribute rejected",
+        "PASS ACL: authenticated controller without grant rejected",
+        "PASS unsupported endpoint rejected",
+        "PASS malformed UDP: 98 datagrams; authenticated read still works",
+        "PASS persisted-state checkpoint: OnOff=true"
+      ]
+    },
+    {
+      "stage": "warm-restart",
+      "checks": [
+        "PASS reboot: stored fabric, CASE authentication and OnOff state restored",
+        "PASS command Off: False",
+        "PASS command On: True",
+        "PASS command Toggle: False",
+        "PASS command Toggle: True",
+        "PASS subscription: changed OnOff attribute reported",
+        "PASS BasicInformation product identity",
+        "PASS WriteAttribute: NodeLabel updated and read back",
+        "PASS WriteAttribute: read-only OnOff attribute rejected",
+        "PASS ACL: authenticated controller without grant rejected",
+        "PASS unsupported endpoint rejected",
+        "PASS malformed UDP: 98 datagrams; authenticated read still works",
+        "PASS persisted-state checkpoint: OnOff=true"
+      ]
+    },
+    {
+      "stage": "storage-failure",
+      "checks": [
+        "PASS commissioning rejected after fabric storage failure"
+      ]
+    },
+    {
+      "stage": "storage-recovery",
+      "checks": [
+        "PASS commissioning: PASE, attestation, CSR, AddNOC, CASE, complete",
+        "PASS command Off: False",
+        "PASS command On: True",
+        "PASS command Toggle: False",
+        "PASS command Toggle: True",
+        "PASS subscription: changed OnOff attribute reported",
+        "PASS BasicInformation product identity",
+        "PASS WriteAttribute: NodeLabel updated and read back",
+        "PASS WriteAttribute: read-only OnOff attribute rejected",
+        "PASS ACL: authenticated controller without grant rejected",
+        "PASS unsupported endpoint rejected",
+        "PASS malformed UDP: 98 datagrams; authenticated read still works",
+        "PASS persisted-state checkpoint: OnOff=true"
+      ]
+    },
+    {
+      "stage": "entropy-failure",
+      "checks": [
+        "failed closed before commissioning"
+      ]
+    }
+  ]
+}

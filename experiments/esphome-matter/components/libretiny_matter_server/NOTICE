@@ -1,0 +1,14 @@
+LibreTiny Matter Server
+Copyright 2026 Sebastian Schmidt
+
+This component uses Project CHIP rs-matter under Apache-2.0.
+Protocol and cluster composition follows the rs-matter standalone examples.
+Pinned upstream: https://github.com/project-chip/rs-matter
+7195e2b1f45df94ee1bc63605b7db91a6878b9dc
+
+The vendored rs-matter-codegen crate retains its upstream license.
+The vendored embassy-sync crate retains its MIT/Apache-2.0 licenses.
+Local changes and original checksums are recorded in rust/vendor/*.json.
+
+The upstream test attestation credentials are public development fixtures.
+They are not product credentials and do not provide a certified product identity.

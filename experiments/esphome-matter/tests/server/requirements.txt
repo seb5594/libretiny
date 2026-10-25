@@ -1,0 +1,3 @@
+# Independent ConnectedHomeIP C++ controller, not the device's Rust implementation.
+home-assistant-chip-core==2025.7.0
+home-assistant-chip-clusters==2025.7.0

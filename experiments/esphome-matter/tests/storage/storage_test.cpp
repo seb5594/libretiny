@@ -15,15 +15,9 @@ extern "C" {
 
 using esphome::libretiny_matter_storage::FlashDBStorage;
 
-// Test only the hardware boundary: erase to 0xff, program 1 -> 0, and retain
-// a flash image between separate processes. Never mock the CHIP interface/DB.
-static std::array<uint8_t, 32768> flash;
-static const fal_flash_dev device = {"test", 0, flash.size(), 4096, {}, 8};
-static const fal_partition partition = {0, "kvs", "test", 0, flash.size(), 0};
-static bool fail_writes = false;
-static uint32_t fail_read_address = UINT32_MAX;
-static size_t fail_read_size = 0;
-static int write_count = 0;
+#include "nor_flash.h"
+
+using namespace test_nor;
 
 #define CHECK(condition)                                          \
   do {                                                            \
@@ -32,41 +26,6 @@ static int write_count = 0;
       std::exit(1);                                               \
     }                                                             \
   } while (false)
-
-extern "C" {
-int fal_init() { return 1; }
-const fal_flash_dev *fal_flash_device_find(const char *name) { return strcmp(name, "test") == 0 ? &device : nullptr; }
-const fal_partition *fal_partition_find(const char *name) { return strcmp(name, "kvs") == 0 ? &partition : nullptr; }
-
-int fal_partition_read(const fal_partition *, uint32_t addr, uint8_t *buf, size_t size) {
-  CHECK(addr <= flash.size() && size <= flash.size() - addr);
-  if (addr == fail_read_address && size == fail_read_size)
-    return -1;
-  memcpy(buf, flash.data() + addr, size);
-  return static_cast<int>(size);
-}
-
-int fal_partition_write(const fal_partition *, uint32_t addr, const uint8_t *buf, size_t size) {
-  CHECK(addr <= flash.size() && size <= flash.size() - addr);
-  if (fail_writes)
-    return -1;
-  for (size_t i = 0; i < size; i++) {
-    CHECK((flash[addr + i] & buf[i]) == buf[i]);
-    flash[addr + i] = buf[i];
-  }
-  ++write_count;
-  return static_cast<int>(size);
-}
-
-int fal_partition_erase(const fal_partition *, uint32_t addr, size_t size) {
-  CHECK(addr % 4096 == 0 && size % 4096 == 0);
-  CHECK(addr <= flash.size() && size <= flash.size() - addr);
-  if (fail_writes)
-    return -1;
-  std::fill_n(flash.data() + addr, size, 0xff);
-  return static_cast<int>(size);
-}
-}
 
 static bool is_owner(void *context) { return *static_cast<std::thread::id *>(context) == std::this_thread::get_id(); }
 
