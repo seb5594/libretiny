@@ -21,6 +21,7 @@ std::filesystem::path directory;
 std::recursive_mutex critical;
 auto started = std::chrono::steady_clock::now();
 volatile std::sig_atomic_t restart_requested;
+volatile std::sig_atomic_t control_requested;
 fdb_kvdb database{};
 esphome::libretiny_matter_storage::FlashDBStorage storage;
 std::thread::id owner;
@@ -67,7 +68,10 @@ extern "C" int32_t ltm_platform_store(uint16_t key, const uint8_t *data, size_t 
 extern "C" int32_t ltm_platform_remove(uint16_t key) {
   char name[12];
   format_key(key, name, sizeof(name));
+  test_nor::fail_writes = std::getenv("LTM_TEST_FAIL_REMOVE") != nullptr;
   const auto error = storage.SyncDeleteKeyValue(name);
+  test_nor::fail_writes = false;
+  fprintf(stderr, "REMOVE key=%04x error=%u\n", key, error.AsInteger());
   return error == CHIP_NO_ERROR || error == CHIP_ERROR_PERSISTED_STORAGE_VALUE_NOT_FOUND ? 0 : -1;
 }
 extern "C" void ltm_platform_log(uint8_t level, const uint8_t *data, size_t len) {
@@ -76,6 +80,11 @@ extern "C" void ltm_platform_log(uint8_t level, const uint8_t *data, size_t len)
 }
 extern "C" void ltm_platform_switch(bool on) { fprintf(stderr, "SWITCH %s\n", on ? "ON" : "OFF"); }
 extern "C" bool ltm_platform_connected() { return true; }
+extern "C" uint8_t ltm_platform_take_command() {
+  const auto result = control_requested;
+  control_requested = 0;
+  return result;
+}
 extern "C" void *ltm_platform_alloc(size_t size, size_t align) {
   void *pointer{};
   return posix_memalign(&pointer, std::max(align, sizeof(void *)), size) == 0 ? pointer : nullptr;
@@ -100,6 +109,10 @@ int main(int argc, char **argv) {
   auto is_owner = [](void *context) { return *static_cast<std::thread::id *>(context) == std::this_thread::get_id(); };
   if (storage.bind(&database, is_owner, &owner) != CHIP_NO_ERROR)
     return 1;
+  constexpr uint32_t sentinel = 0x72381234;
+  fdb_blob blob{};
+  if (fdb_kv_set_blob(&database, "3723155177", fdb_blob_make(&blob, &sentinel, sizeof(sentinel))) != FDB_NO_ERR)
+    return 1;
   LtmConfig config{};
   config.passcode = 20202021;
   config.discriminator = 3840;
@@ -123,6 +136,9 @@ int main(int argc, char **argv) {
       return 1;
   }
   std::signal(SIGUSR1, [](int) { restart_requested = 1; });
+  std::signal(SIGUSR2, [](int) { control_requested = static_cast<int>(LtmCommand::OPEN_WINDOW); });
+  std::signal(SIGWINCH, [](int) { control_requested = static_cast<int>(LtmCommand::CLOSE_WINDOW); });
+  std::signal(SIGHUP, [](int) { control_requested = static_cast<int>(LtmCommand::FACTORY_RESET); });
   if (!ltm_udp_open(&config) || ltm_server_init(&config) != 0) {
     perror("server initialization");
     return 1;
@@ -137,8 +153,17 @@ int main(int argc, char **argv) {
       }
       fprintf(stderr, "WARM_RESTART\n");
     }
-    if (ltm_server_poll() != 0) {
+    const int result = ltm_server_poll();
+    if (result < 0)
       return 1;
+    if (result > 0) {
+      uint32_t preserved{};
+      if (fdb_kv_get_blob(&database, "3723155177", fdb_blob_make(&blob, &preserved, sizeof(preserved))) !=
+              sizeof(preserved) ||
+          preserved != sentinel)
+        return 1;
+      fprintf(stderr, "RESET_PRESERVED_ESPHOME_PREFERENCES\n");
+      restart_requested = 1;
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }

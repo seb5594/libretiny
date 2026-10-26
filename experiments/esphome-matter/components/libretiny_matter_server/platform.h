@@ -24,6 +24,10 @@ struct LtmPeer {
   uint8_t ipv4;
 };
 
+enum class LtmCommand : uint8_t { NONE = 0, OPEN_WINDOW = 1, CLOSE_WINDOW = 2, FACTORY_RESET = 3 };
+uint8_t ltm_platform_take_command();
+
+// poll: 0 = running, 1 = restart after reset, -1 = retryable failure, -2 = failed reset.
 int32_t ltm_server_init(const LtmConfig *config);
 int32_t ltm_server_poll();
 void ltm_server_stop();

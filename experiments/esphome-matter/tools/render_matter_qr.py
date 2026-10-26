@@ -40,21 +40,23 @@ def render(payload, output, manual=None):
     code = ""
     if manual:
         pretty = f"{manual[:4]}-{manual[4:7]}-{manual[7:]}"
-        code = f'<p>Manueller Kopplungscode</p><strong class="manual">{pretty}</strong>'
+        code = f'<p>Manual pairing code</p><strong class="manual">{pretty}</strong>'
     page.write_text(
-        '<!doctype html><html lang="de"><meta charset="utf-8">'
+        '<!doctype html><html lang="en"><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
-        "<title>Matter koppeln</title><style>"
+        "<title>Pair with Matter</title><style>"
         "body{font-family:system-ui,sans-serif;text-align:center;background:#fff;color:#111;"
         "margin:2rem auto;max-width:34rem;padding:1rem}"
         "svg{width:min(85vw,360px);height:auto;display:block;margin:auto}"
         ".manual{font-size:2rem;letter-spacing:.06em}code{overflow-wrap:anywhere}"
-        "</style><h1>Matter koppeln</h1><p>Gerät und Controller im selben WLAN. "
-        "Das Kopplungsfenster muss geöffnet sein.</p>"
+        "</style><h1>Pair with Matter</h1>"
+        "<p>Keep the device and controller on the same LAN. "
+        "The commissioning window must be open.</p>"
         + vector.to_string(encoding="unicode")
         + code
         + f"<p><code>{html.escape(payload)}</code></p>"
-        "<p>LibreTiny-Entwicklungsgerät mit Testzertifikaten.</p></html>\n",
+        "<p>LibreTiny development device with test attestation credentials.</p>"
+        "</html>\n",
         encoding="utf-8",
     )
     return png, svg, page

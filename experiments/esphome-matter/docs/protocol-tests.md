@@ -1,59 +1,53 @@
-# Matter-Nachrichten auf vorhandenen ESPHome-Geräten testen
+# Test Matter codecs on existing ESPHome devices
 
-Dieser Abschnitt beschreibt die separaten Codec-Selbsttests. Für den inzwischen
-implementierten Netzwerkserver mit Pairing siehe [Matter-Server](matter-server.md).
+This guide covers the separate codec self-tests. For the implemented network
+server and pairing, see [the native Matter server](matter-server.md).
 
-Die Komponente `libretiny_matter_protocol` baut originale Matter-Codecs unter
-LibreTiny und führt dieselben 72 Prüfungen auf dem Host und auf der MCU aus.
-Sie erzeugt und liest echte **Interaction-Model-Nutzdaten für Off, On und Toggle**
-mit den unveränderten CHIP-Klassen `InvokeRequestMessage`, `CommandDataIB`,
-`CommandPathIB`, `TLVReader` und `TLVWriter`.
+`libretiny_matter_protocol` builds original Matter codecs under LibreTiny and runs
+the same 72 checks on the host and MCU. It writes and reads real **Interaction Model
+payloads for Off, On and Toggle** using unmodified CHIP `InvokeRequestMessage`,
+`CommandDataIB`, `CommandPathIB`, `TLVReader` and `TLVWriter` classes.
 
-**Das ist noch kein koppelbares Matter-Gerät.** Geprüft wird die Verarbeitung der
-Nachrichtennutzdaten. Verschlüsselte UDP-Pakete, PASE/CASE, Controller-Verbindungen,
-mDNS, Zugriffsrechte, Subscriptions und Relaissteuerung sind noch nicht angebunden.
-Der Test öffnet keinen Netzwerkport und schreibt keine Flash-Testdaten.
+**The codec component alone is not a commissionable Matter device.** It checks
+payload processing, without encrypted UDP, PASE/CASE, controller connections, mDNS,
+access control, subscriptions or relay mapping. It opens no port and writes no
+flash test data. Those protocol services belong to the separate native server.
 
-## Zu einer bestehenden Konfiguration hinzufügen
+## Add to an existing configuration
 
-In der vorhandenen Geräte-YAML diese Package-Zeile ergänzen. Falls `packages:`
-bereits existiert, darunter nur den neuen Eintrag hinzufügen:
+Add this package to your device YAML. If `packages:` already exists, add only the
+new entry beneath it:
 
 ```yaml
 packages:
-  matter_protocol_test: github://seb5594/libretiny/experiments/esphome-matter/examples/existing-device-package.yaml@feat/esphome-matter-feasibility
+  matter_protocol_test: github://seb5594/libretiny/experiments/esphome-matter/examples/existing-device-package.yaml@matter-v0.1.0-alpha.1
 ```
 
-Das Package ergänzt die externen Komponenten und einen Diagnosebutton. Es setzt
-kein Board, keine Pins, keine WLAN-Daten und keine Frameworkquelle. Deine bestehende
-Konfiguration kann weiter die **offizielle LibreTiny-Plattform** verwenden.
-Geprüfte Versionen: ESPHome 2026.10.0 und LibreTiny 1.14.0. Der Branch ist ein
-Entwicklungsstand; für einen dauerhaft reproduzierbaren Aufbau auf einen geprüften
-Commit pinnen.
+The package adds external components and a diagnostic button. It does not set a
+board, GPIOs, Wi-Fi credentials or framework source. Your existing configuration
+can continue using **official LibreTiny**. Tested versions are ESPHome 2026.10.0
+and LibreTiny 1.14.0. The release tag pins package and component sources.
 
-1. Geräte-YAML zunächst kompilieren und den ausgewiesenen Flashbedarf prüfen.
-2. Mit dem für dieses Gerät bereits eingerichteten ESPHome-Verfahren installieren.
-3. Nach dem Neustart ESPHome-Logs öffnen. Erwartete Meldung:
+1. Compile your device YAML and check the reported flash usage.
+2. Install using the device's established ESPHome procedure.
+3. Open the ESPHome log after reboot. Expected output:
 
    ```text
    [libretiny_matter_protocol] Matter codec tests: passed=72 failed=0 duration=... ms
    ```
 
-4. Über den Diagnosebutton **Matter codec self-test** lässt sich der Test erneut
-   ausführen. Der Button erscheint über die vorhandene ESPHome-API; ohne API bleibt
-   der automatische Test mit Logausgabe beim Boot verfügbar.
+4. Run the **Matter codec self-test** diagnostic button to repeat the checks. It is
+   available through an existing ESPHome API. Without API, the boot test still logs.
 
-Bei einem Fehler werden Anzahl und erster fehlgeschlagener Test geloggt. Für die
-weitere Entwicklung sind Chip-/Modulname, ESPHome-/LibreTiny-Version, diese Meldung,
-Laufzeit und Build-Speicherwerte hilfreich. Ein positives Ergebnis bestätigt die
-Codecs auf diesem Build; es bestätigt noch keine Matter-Kopplung oder Funkübertragung.
+Failures report their count and the first failed check. Include chip/module,
+ESPHome/LibreTiny versions, this message, duration and build memory figures when
+reporting results. Passing confirms codecs for that build, not pairing or radio
+operation. Set `libretiny_matter_protocol: {run_on_boot: false}` to disable the boot
+test while keeping the button.
 
-Mit `libretiny_matter_protocol: {run_on_boot: false}` im Geräteprofil lässt sich
-der automatische Start abschalten; der Diagnosebutton bleibt nutzbar.
+## Standalone profiles
 
-## Eigenständige Buildbeispiele
-
-Die folgenden Profile verwenden explizit die offizielle LibreTiny-Version 1.14.0:
+These examples explicitly use official LibreTiny 1.14.0:
 
 ```sh
 esphome compile examples/bk7231n-protocol.yaml
@@ -62,54 +56,45 @@ esphome compile examples/ln882h-protocol.yaml
 esphome compile examples/rtl8720cf-protocol.yaml
 ```
 
-Für ein vorhandenes Relais-/Lampen-Gerät das obige Package verwenden: Die vier
-Minimalprofile enthalten nur die Diagnoseanwendung und keine gerätespezifische
-Steuerung. Der Protokoll-Selbsttest benötigt kein IPv6; LN882H/RTL8720CF können ihn
-daher trotz ihrer derzeitigen ESPHome-IPv6-Grenze ausführen.
+Use the package above for an existing relay/light: these minimal profiles contain
+only diagnostics, not the device's own controls. Codec tests do not need IPv6, so
+LN882H/RTL8720CF can run them despite their current ESPHome IPv6 limitation.
 
-## Was geprüft wird
+## Coverage
 
-- Off, On und Toggle werden mit den originalen CHIP-Buildern serialisiert und
-  bytegenau mit festen Referenzvektoren verglichen. Die Original-Parser lesen
-  Endpoint 1, OnOff-Cluster `0x0006`, Befehl und Interaction-Model-Revision zurück.
-- Jeder der 29 Abschneidepunkte eines Referenzpakets wird geprüft. Jeder zu kleine
-  Ausgabepuffer wird einschließlich Schutzbytes vor und hinter dem Puffer geprüft.
-- Falscher Wurzeltyp, nachfolgende TLV-Daten und im Test nicht unterstützte zeitlich
-  gebundene Aufrufe werden abgewiesen. Weitere Hosttests prüfen fehlende Pfadfelder,
-  fehlende Revision und falsche Feldtypen.
-- Unabhängige TLV-Vektoren prüfen 64-Bit-Grenzwerte, Byte-Reihenfolge, eine
-  Integer-Verengung, eine abgeschnittene Bytefolge und UTF-8-Ausgabe.
-- Hosttests laufen mit AddressSanitizer und UndefinedBehaviorSanitizer, einschließlich
-  20.000 reproduzierbarer zufälliger Eingaben. Das ist begrenztes Fuzzing und kein
-  Nachweis der vollständigen Matter-Konformität.
+- Original CHIP builders serialize Off/On/Toggle and compare every byte against
+  fixed vectors. Original parsers read endpoint 1, OnOff cluster `0x0006`, command
+  and Interaction Model revision back.
+- Every one of 29 truncation points and each undersized output buffer is tested,
+  including guard bytes before and after the buffer.
+- Wrong root type, trailing TLV and unsupported timed requests are rejected.
+  Additional host cases cover missing path fields/revision and wrong field types.
+- Independent TLV vectors cover 64-bit boundaries, byte order, integer narrowing,
+  a truncated byte string and UTF-8 output.
+- Host checks use AddressSanitizer/UndefinedBehaviorSanitizer and 20,000 reproducible
+  random parser inputs. This is bounded fuzzing, not complete Matter conformance.
 
-`protocol_codec.cpp` enthält begrenzte **Test-/Inspektionshilfen** für genau einen
-zeitlich ungebundenen OnOff-Aufruf mit leeren Befehlsfeldern und höchstens 512 Bytes.
-Diese Hilfen prüfen weder sämtliche Schema-Regeln noch Berechtigungen und dürfen
-nicht als authentifizierter Netzwerk-Command-Handler verwendet werden. Der spätere
-Server muss CHIP Session Manager, Exchange Manager und Interaction Model Engine
-nutzen. Das Experiment implementiert diese Schichten nicht parallel nach.
+`protocol_codec.cpp` contains limited test/inspection helpers for one untimed OnOff
+invoke with empty command fields and at most 512 bytes. They do not validate every
+schema rule or authorization and must not become network command handlers. The
+native server uses upstream rs-matter's sessions/exchanges/Interaction Model.
 
-## Quellen und Wiederverwendung
+## Sources and reuse
 
-Der gemeinsame Unterbau liegt in `components/libretiny_matter/vendor/connectedhomeip`.
-Er enthält nur die tatsächlich benötigten Upstream-Quellen und Header, einschließlich
-der `nLIO`-Byteorder-Abhängigkeit. Beide verwenden Apache-2.0; Lizenzen, Copyrights,
-Commit-IDs und Datei-Prüfsummen sind erhalten. Die Testquellen sind eigene Dateien.
-Der Speicheradapter verwendet dieselben CHIP-Definitionen.
+`components/libretiny_matter/vendor/connectedhomeip` contains only required upstream
+sources/headers, including the `nLIO` byte-order dependency. Both are Apache-2.0;
+licenses, copyrights, commits and checksums remain intact. Test sources are local.
+The storage adapter uses the same CHIP definitions.
 
-Der gepinnte CHIP-Entwicklungsstand
-`4b4a3e405882afaf8161c0e4af244e65fa8f3f94` kodiert Interaction-Model-Revision 12.
-Das ist kein zertifizierter Release dieses Ports. Für einen vollständigen Server
-müssen Stack-Version, Konfiguration und Geräteprofile gemeinsam festgelegt werden.
-Der Codec-Unterbau darf nicht neben einer zweiten, anders konfigurierten CHIP-
-Bibliothek im selben Build eingebunden werden.
+Pinned CHIP commit `4b4a3e405882afaf8161c0e4af244e65fa8f3f94` encodes Interaction
+Model revision 12. This is not a certified port release. Do not link this codec
+subset alongside another differently configured C++ CHIP library. The Rust server
+and C++ codec tests have separate roles, explained in [architecture.md](architecture.md).
 
 ```sh
 esphome compile tests/protocol-host.yaml
 pytest -q tests/test_protocol.py
 ```
 
-Die nächsten fehlenden Plattformbausteine sind sichere Entropie, Crypto-/Zeit-/Task-
-Anbindung und der vollständige Server-Build. Erst danach können Pairing und echte
-On/Off-Befehle eines Controllers auf Hardware geprüft werden.
+The [first hardware test](first-hardware-test.md) now covers the native server,
+including pairing and real controller commands for a virtual light.

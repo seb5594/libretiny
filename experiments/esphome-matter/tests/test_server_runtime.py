@@ -57,7 +57,17 @@ def runtime_binary(tmp_path_factory):
 
 
 @pytest.mark.parametrize(
-    "scenario", ["network", "low_heap", "task_failure", "random", "allocator"]
+    "scenario",
+    [
+        "network",
+        "low_heap",
+        "task_failure",
+        "random",
+        "allocator",
+        "reset_failure",
+        "reset_restart",
+        "worker_failure",
+    ],
 )
 def test_runtime(runtime_binary, scenario):
     subprocess.run([str(runtime_binary), scenario], check=True, timeout=10)

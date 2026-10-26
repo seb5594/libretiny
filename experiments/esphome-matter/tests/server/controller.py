@@ -63,7 +63,19 @@ async def exercise(
     code_kind,
     passcode,
     discriminator,
+    fresh_state,
+    expect_unpaired,
 ):
+    if expect_unpaired:
+        try:
+            await asyncio.wait_for(
+                controller.ReadAttribute(NODE, [(1, clusters.OnOff.Attributes.OnOff)]),
+                35,
+            )
+        except (TimeoutError, chip.exceptions.ChipStackError):
+            print("PASS reset: previous fabric can no longer authenticate", flush=True)
+            return {"previous_fabric_rejected": True}
+        raise AssertionError("previous fabric still authenticated after factory reset")
     codes = verify_setup(setup_log, passcode, discriminator) if setup_log else None
     if wrong_pin:
         # The SDK can emit multiple completion callbacks for one failed PASE.
@@ -114,6 +126,17 @@ async def exercise(
         data = await controller.ReadAttribute(NODE, [(1, attribute)])
         return data[1][clusters.OnOff][attribute]
 
+    if fresh_state:
+        assert await read_on_off() is False
+        initial = await controller.ReadAttribute(NODE, [(0, label)])
+        assert initial[0][clusters.BasicInformation][label] == ""
+        fabric_count = clusters.OperationalCredentials.Attributes.CommissionedFabrics
+        fabrics = await controller.ReadAttribute(NODE, [(0, fabric_count)])
+        assert fabrics[0][clusters.OperationalCredentials][fabric_count] == 1
+        print(
+            "PASS reset: fresh OnOff, NodeLabel and exactly one new fabric", flush=True
+        )
+
     if not commission:
         assert await read_on_off() is True
         restored = await controller.ReadAttribute(NODE, [(0, label)])
@@ -162,6 +185,10 @@ async def exercise(
         == "LibreTiny test light"
     )
     print("PASS BasicInformation product identity", flush=True)
+    version = clusters.BasicInformation.Attributes.SoftwareVersionString
+    software = await controller.ReadAttribute(NODE, [(0, version)])
+    assert software[0][clusters.BasicInformation][version] == "0.1.0-alpha.1"
+    print("PASS BasicInformation alpha software version", flush=True)
 
     written = await controller.WriteAttribute(
         NODE, [(0, label("LibreTiny interoperability"))]
@@ -230,6 +257,8 @@ def main():
     parser.add_argument("--code-kind", choices=["qr", "manual"], default="qr")
     parser.add_argument("--passcode", type=int, default=20202021)
     parser.add_argument("--discriminator", type=int, default=3840)
+    parser.add_argument("--fresh-state", action="store_true")
+    parser.add_argument("--expect-unpaired", action="store_true")
     args = parser.parse_args()
     chip.native.Init()
     stack = ChipStack(str(args.storage), enableServerInteractions=False)
@@ -259,6 +288,8 @@ def main():
                 args.code_kind,
                 args.passcode,
                 args.discriminator,
+                args.fresh_state,
+                args.expect_unpaired,
             )
         )
         print(json.dumps(result), flush=True)

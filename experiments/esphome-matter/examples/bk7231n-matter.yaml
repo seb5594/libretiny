@@ -32,6 +32,7 @@ mdns:
 # The Matter test device exposes endpoint 1 without touching any GPIO.
 # Test attestation credentials: this image is for development, not certification.
 libretiny_matter_server:
+  id: native_matter
   passcode: 20202021
   discriminator: 3840
   commissioning_seconds: 300

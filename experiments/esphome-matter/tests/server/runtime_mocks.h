@@ -20,6 +20,8 @@ constexpr uint32_t portMAX_DELAY = UINT32_MAX;
 #define INCLUDE_uxTaskGetStackHighWaterMark 1
 inline unsigned tasks_created;
 inline unsigned stack_words;
+inline void (*worker_entry)(void *);
+inline unsigned tasks_deleted;
 inline bool create_task_ok = true;
 inline uint32_t clock_ms = 10000;
 inline bool online;
@@ -34,15 +36,16 @@ inline int xQueueSend(void *, void *, uint32_t) { return pdTRUE; }
 inline int xSemaphoreTake(void *, uint32_t) { return pdTRUE; }
 inline void xSemaphoreGive(void *) {}
 inline void vTaskDelay(uint32_t) {}
-inline void vTaskDelete(void *) {}
+inline void vTaskDelete(void *) { tasks_deleted++; }
 inline void vTaskSuspend(void *) { std::abort(); }
 inline void vPortEnterCritical() {}
 inline void vPortExitCritical() {}
 inline void *pvPortMalloc(size_t bytes) { return std::malloc(bytes); }
 inline void vPortFree(void *ptr) { std::free(ptr); }
 inline unsigned uxTaskGetStackHighWaterMark(void *) { return 1000; }
-inline int xTaskCreate(void (*)(void *), const char *, unsigned words, void *, unsigned, TaskHandle_t *) {
+inline int xTaskCreate(void (*entry)(void *), const char *, unsigned words, void *, unsigned, TaskHandle_t *) {
   tasks_created++;
+  worker_entry = entry;
   stack_words = words;
   return create_task_ok ? pdPASS : 0;
 }

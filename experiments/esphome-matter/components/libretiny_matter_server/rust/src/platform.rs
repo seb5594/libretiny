@@ -51,6 +51,7 @@ unsafe extern "C" {
     fn ltm_platform_log(level: u8, data: *const u8, len: usize);
     pub fn ltm_platform_switch(on: bool);
     pub fn ltm_platform_connected() -> bool;
+    pub fn ltm_platform_take_command() -> u8;
     fn ltm_platform_alloc(size: usize, align: usize) -> *mut u8;
     fn ltm_platform_free(ptr: *mut u8);
     fn ltm_platform_enter_critical();

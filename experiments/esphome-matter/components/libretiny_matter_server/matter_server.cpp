@@ -40,6 +40,7 @@ uint32_t poll_max_ms;
 uint32_t minimum_stack_bytes;
 LtmConfig network_config{};
 uint32_t network_generation;
+LtmCommand pending_command = LtmCommand::NONE;
 
 void run_server(void *) {
   bool active = false;
@@ -100,9 +101,18 @@ void run_server(void *) {
       ltm_server_stop();
       ltm_udp_close();
       active = false;
-      if (++failures >= 3)
+      if (result == -2) {
+        ESP_LOGE(TAG, "Matter reset failed; stopped until device restart");
         break;
-      vTaskDelay(pdMS_TO_TICKS(5000));
+      }
+      if (result < 0) {
+        if (++failures >= 3)
+          break;
+        vTaskDelay(pdMS_TO_TICKS(5000));
+      } else {
+        failures = 0;
+        ESP_LOGI(TAG, "Restarting Matter after local factory reset");
+      }
     }
     vTaskDelay(pdMS_TO_TICKS(10) ? pdMS_TO_TICKS(10) : 1);
   }
@@ -128,6 +138,20 @@ int32_t storage_call(Operation operation, uint16_t key, uint8_t *data, size_t si
 }  // namespace
 
 namespace esphome::libretiny_matter_server {
+bool MatterServer::request_control_(LtmCommand command) {
+  bool accepted;
+  taskENTER_CRITICAL();
+  accepted = this->started_ && connected && !worker_failed && pending_command == LtmCommand::NONE;
+  if (accepted)
+    pending_command = command;
+  taskEXIT_CRITICAL();
+  if (accepted)
+    ESP_LOGI(TAG, "Queued local Matter command=%u", static_cast<unsigned>(command));
+  else
+    ESP_LOGW(TAG, "Matter command rejected: server not ready or another command pending");
+  return accepted;
+}
+
 void MatterServer::setup() {
   if (this->storage_ == nullptr || this->storage_->is_failed()) {
     this->mark_failed();
@@ -332,6 +356,14 @@ extern "C" void ltm_platform_switch(bool on) {
   taskENTER_CRITICAL();
   worker_on_off = on;
   taskEXIT_CRITICAL();
+}
+extern "C" uint8_t ltm_platform_take_command() {
+  uint8_t result;
+  taskENTER_CRITICAL();
+  result = static_cast<uint8_t>(pending_command);
+  pending_command = LtmCommand::NONE;
+  taskEXIT_CRITICAL();
+  return result;
 }
 extern "C" bool ltm_platform_connected() {
   bool result;

@@ -1,90 +1,92 @@
-# Architektur des nativen Matter-Ports
+# Native Matter port architecture
 
-Die aktive Serverimplementierung verwendet **Project CHIP rs-matter** statt einen
-ESP-IDF-Port oder die fremde BK7238-SDK-Firmware. Protokoll, Kryptografie und
-Clusterzustände stammen aus dem gepinnten Upstream. Die Plattformanbindung ist klein
-und getrennt von ESPHomes Python-Schema und dem Matter-Datenmodell.
+The server uses **Project CHIP rs-matter**. Protocol handling, cryptography and
+cluster state come from a pinned upstream version. Platform integration is kept
+separate from ESPHome's Python schema and the Matter data model.
 
 ```text
-ESPHome YAML -> Validierung / Codegen
+ESPHome YAML -> validation / code generation
     |
-MatterServer: ESPHome-Mainloop
-    |-- bestehendes WLAN und IPv6 / Adressänderungen
-    |-- FlashDB-Delegate im selben Task wie ESPHome-Preferences
-    |-- Queue (1 Request) + Semaphore
+MatterServer: ESPHome main loop
+    |-- existing Wi-Fi and IPv6 / address changes
+    |-- FlashDB delegate in the ESPHome preferences task
+    |-- one-request queue + semaphore
+    |-- local commissioning/reset commands and virtual state
     |
-FreeRTOS-Matter-Worker (24 KiB Stack, Priorität 1)
-    |-- C ABI: TRNG, Zeit, Allocator, Logs, Storage, UDP
-    |-- rs-matter: PASE/CASE, MRP, Fabric/ACL, Interaction Model
-    |-- Root-Endpoint: WLAN-Diagnose, Administration, Attestation
-    `-- Endpoint 1: Descriptor, Identify, Groups, OnOff-Licht
+FreeRTOS Matter worker (24 KiB stack, priority 1)
+    |-- C ABI: TRNG, time, allocator, logs, storage, UDP
+    |-- rs-matter: PASE/CASE, MRP, fabrics/ACL, Interaction Model
+    |-- root endpoint: Wi-Fi diagnostics, administration, attestation
+    `-- endpoint 1: Descriptor, Identify, Groups, OnOff light
 ```
 
-Der Server berührt keine GPIOs. Der virtuelle OnOff-Zustand wird unter einer
-Critical Section an den Mainloop übergeben. Eine spätere Entity-Zuordnung gehört
-in diese ESPHome-Schicht; netzwerkspezifische Details gehören weiter hinter die C ABI.
-Das entspricht der Trennung gemeinsamer Konfiguration und Plattformbackends in
-ESPHomes Zigbee-Komponente, ohne deren nicht austauschbares Funkprotokoll zu kopieren.
+The server does not configure GPIOs. A critical section protects the virtual OnOff
+state shared with the main loop. Future entity mapping belongs in the ESPHome
+layer; platform networking remains behind the C ABI. This follows the separation
+of common configuration and platform backends in ESPHome's Zigbee component.
+Zigbee's radio protocol is not interchangeable with Matter.
 
-## Plattformvertrag
+## Platform contract
 
-- ESPHome besitzt WLAN-Zugangsdaten und Reconnect. Der Server wartet auf gültiges IPv6.
-  Adressänderungen beenden laufende Sessions; der Stack startet mit gespeicherten
-  Fabrics neu. Matter-WLAN-Scan/Netzwechsel werden explizit abgelehnt.
-- Zwei nicht blockierende Dualstack-UDP-Sockets: Matter 5540 und mDNS 5353.
-  Receive-Buffer begrenzt, übergroße Pakete verworfen, keine zusätzliche Paketqueue.
-  Der Rust-Empfänger gibt zwischen Datagrammen an den Executor zurück. Dieser pollt
-  alle 10 ms; Send-Wiederholungen bei `EAGAIN` sind begrenzt.
-- Eine einplatzige Queue übergibt Speicheraufträge vom Worker an den ESPHome-Mainloop.
-  Der Worker wartet bis zur Bestätigung, damit kein auslaufender Stackpointer im
-  Mainloop verbleibt. Alle gemeinsamen FlashDB-Zugriffe bleiben im Mainloop.
-- FlashDB verwendet vorhandene Partition und Schlüssel `matter/rs/xxxx`, bis 2 KiB
-  pro Wert. Der bereits geprüfte C++-CHIP-Delegate wird wiederverwendet.
-  Keine separate ungeprüfte KV-Implementierung; keine neue Flashpartition.
-- Entropie über Beken `sddev_control(IRDA_DEV_NAME, TRNG_CMD_GET, ...)`, wortweise mit
-  Fehlerkontrolle. Drei identische aufeinanderfolgende Wörter stoppen Matter.
-  Dieser Kontinuitätstest ist keine Entropiezertifizierung. Der alte BDK-Bytehelper
-  und `lt_rand_bytes()`/`rand()` werden nicht für Matter verwendet.
-- FreeRTOS übernimmt Heap und Critical Sections. Die Uhr erweitert den
-  Millisekundenzähler über Wraparound. Rust-Panics/Entropiefehler stoppen den Worker;
-  ESPHome bleibt aktiv. Das stellt keinen Schutz gegen Hardware-Stacküberläufe dar.
-- Statische Protokollzustände werden direkt am Zielort initialisiert. Große temporäre
-  Stackkopien werden vermieden. Warmstop droppt den Future vor den geliehenen
-  Protokollzuständen; init/poll/stop laufen ausschließlich im selben Worker.
+- ESPHome owns Wi-Fi credentials and reconnection. Matter waits for valid IPv6.
+  Address changes close sessions and restart the stack with persisted fabrics.
+  Matter Wi-Fi scan/network changes are explicitly rejected.
+- Two nonblocking dual-stack UDP sockets serve Matter on 5540 and mDNS on 5353.
+  Receive buffers are bounded; oversized packets are discarded without another
+  packet queue. The Rust receiver yields between datagrams. The executor polls
+  every 10 ms; send retries after `EAGAIN` are bounded.
+- A single-entry queue dispatches storage operations to the ESPHome main loop.
+  The worker waits for acknowledgement so a borrowed stack pointer cannot expire
+  while the main loop is still using it. All shared FlashDB access stays there.
+- FlashDB uses the existing partition and `matter/rs/xxxx` keys, with values up to
+  2 KiB. The tested C++ CHIP storage delegate is reused. No new partition is added.
+- Entropy uses Beken `sddev_control(IRDA_DEV_NAME, TRNG_CMD_GET, ...)`, one checked
+  word at a time. Three identical consecutive words stop Matter. This continuity
+  check is not entropy certification. Neither the old BDK byte helper nor
+  `lt_rand_bytes()`/`rand()` supplies Matter entropy.
+- FreeRTOS provides heap and critical sections. The clock extends millisecond
+  counter wraparound. Rust panics/entropy errors stop the worker while ESPHome
+  remains active; this is not protection against hardware stack overflow.
+- Static protocol state is initialized in place to avoid large temporary stack
+  copies. Warm stop drops the future before its borrowed protocol state.
+  Initialization, polling and stopping all run in the same worker.
+- Local commands use a one-entry mailbox. Opening/closing uses upstream Interaction
+  Model APIs. Reset first drops network tasks, resets cluster state and removes
+  Matter keys, then restarts Matter. It retains ESPHome's numeric preferences.
+  A failed reset returns an error; it never reports successful completion.
 
-## Reproduzierbare Abhängigkeiten
+## Reproducible dependencies
 
-`rs-matter` 0.4.1, Commit `7195e2b1f45df94ee1bc63605b7db91a6878b9dc`,
-Apache-2.0, implementiert Matter-1.6-Schemata. Der getestete Controller ist
-ConnectedHomeIP aus `home-assistant-chip-core/clusters==2025.7.0`.
-Nightly-Rust `2026-10-24` baut `core`/`alloc` für `thumbv5te-none-eabi`.
-`Cargo.lock` pinnt transitive Abhängigkeiten; `cargo --locked` verhindert stille Updates.
+`rs-matter` 0.4.1, commit `7195e2b1f45df94ee1bc63605b7db91a6878b9dc`,
+Apache-2.0, implements Matter 1.6 schemas. The independent controller is
+ConnectedHomeIP from `home-assistant-chip-core/clusters==2025.7.0`.
+Rust nightly `2026-10-24` builds `core`/`alloc` for `thumbv5te-none-eabi`.
+`Cargo.lock` pins transitive dependencies; `cargo --locked` prevents silent updates.
 
-Zwei eng begrenzte lokale Upstream-Anpassungen liegen unter `rust/vendor`:
+Two limited upstream adaptations live under `rust/vendor`:
 
-1. `embassy-sync` verwendet in `LazyLock`/`OnceLock` portable atomics statt der auf
-   ARMv5TE fehlenden Core-Atomics. Critical Sections kommen aus FreeRTOS.
-2. `rs-matter-codegen` erzeugt nur die 53 von den kompilierten Modulen referenzierten
-   Clusterdeklarationen. Alle genutzten Felder/Kommandos bleiben unverändert. Ohne
-   Filter erzeugt Upstream über 30 MB Rust und überschreitet das Compiler-RAM-Budget.
+1. `embassy-sync` uses portable atomics in `LazyLock`/`OnceLock` because ARMv5TE
+   lacks the required core atomics. FreeRTOS provides the critical sections.
+2. `rs-matter-codegen` generates only the 53 cluster declarations referenced by
+   compiled modules. Used fields/commands remain unchanged. Unfiltered upstream
+   generates over 30 MB of Rust and exceeds the compiler memory budget.
 
-Manifestdateien dokumentieren Originalchecksummen und geänderte Dateien. Tests
-prüfen unveränderte Dateien. Lizenzen bleiben erhalten. Kryptografische Algorithmen
-und Protokollimplementierungen wurden nicht lokal neu geschrieben.
+Manifests record original checksums and modified files. Tests verify unchanged
+files. Licenses and copyrights remain intact. Cryptographic algorithms and protocol
+implementations have not been locally reimplemented.
 
-## Nachweis und verbleibende Arbeit
+## Evidence and remaining work
 
-Softwareseitig nachgewiesen: sichere Kopplung, Attestation mit öffentlichen
-Testzertifikaten, NOC/Fabric-Persistenz, CASE nach Neustart, OnOff/Read/Subscribe,
-ACL-Verweigerung, ungültige Pakete, Speicher-/Entropiefehler, Warmstart und Builds
-für beide Beken-Ziele, einschließlich API/OTA-Vergleichsprofilen.
+The [validation report](validation.md) records controller interoperability, platform
+simulation and Beken firmware builds. These cover development attestation, stored
+fabrics, CASE after restart, OnOff/read/write/subscribe, access rejection, malformed
+packets, storage/entropy failures and the local control/reset lifecycle.
 
-Noch offen: tatsächlicher Beken-Funkbetrieb und Ressourcenmessung, physischer
-Stromausfall beim Flashen, Multi-Fabric-/Gruppenlast, mehrere gleichzeitige
-Subscriptions, Produkt-Attestation, Entity-Mapping, benutzerseitiger Reset und
-optionales BLE-Provisioning. LN882H/RTL8720C brauchen zusätzliche IPv6-/Plattformarbeit.
+Remaining work includes actual Beken radio/resource measurements, power loss during
+flash operations, multiple fabrics/groups/subscriptions under load, product
+attestation, entity mapping and optional BLE provisioning. LN882H/RTL8720C need
+additional IPv6/platform integration.
 
-Performancewerte dürfen erst aus MCU-Messungen abgeleitet werden: Flash, statisches
-RAM, Stack-Minimum, Heap-Minimum, PASE/CASE-Dauer, Befehlslatenz und 24-Stunden-Verlauf.
-Ein erfolgreicher Link beweist weder verbleibenden Laufzeit-Heap noch ausreichende
-ARM9-Kryptografieleistung.
+Performance claims require MCU measurements: flash, static RAM, minimum remaining
+stack/heap, PASE/CASE duration, command latency and a 24-hour run. Successful linking
+does not establish runtime headroom or sufficient ARM9 cryptographic performance.

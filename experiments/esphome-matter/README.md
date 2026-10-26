@@ -1,83 +1,89 @@
-# Matter über WLAN für ESPHome und LibreTiny
+# Matter over Wi-Fi for ESPHome and LibreTiny
 
-**Nativer Entwicklungsserver für BK7231N und BK7238/Tuya T1.**
-`libretiny_matter_server` verbindet den Project-CHIP-Stack **rs-matter** mit
-ESPHome, LibreTiny, FreeRTOS, lwIP und der vorhandenen FlashDB. Ein virtueller
-On/Off-Licht-Endpunkt lässt sich mit einem unabhängigen ConnectedHomeIP-Controller
-koppeln, schalten, lesen und abonnieren. Manueller Matter-Kopplungscode und
-QR-Nutzlast werden auf Wunsch ausgegeben; ein lokales Werkzeug erzeugt PNG/SVG
-und eine druckbare Seite. Fabric und Schaltzustand überleben
-Neustarts. Die Firmware verwendet die **offizielle LibreTiny-Version 1.14.0**.
+**Hardware test release: `matter-v0.1.0-alpha.1` — BK7231N first, BK7238/Tuya T1 second.**
+This native ESPHome external component runs Project CHIP **rs-matter** on the
+**official LibreTiny 1.14.0** platform. It provides a virtual On/Off light, secure
+commissioning, persistent fabrics, subscriptions, manual setup codes and QR codes.
 
-**Auf echter Beken-Hardware noch nicht ausgeführt.** Host-Interoperabilität,
-MCU-Build und simulierte Plattformtests sind belegt; Funkbetrieb, tatsächlicher
-Heap-/Stack-Spitzenbedarf und PASE-Laufzeit auf ARM9 benötigen UART-Messungen.
-Das ist ein konkreter Testkandidat, kein zertifiziertes oder fertig vermessenes Produkt.
+The software is ready for a first controlled device test. Independent controller
+interoperability, simulated platform tests and firmware builds are verified.
+**It has not yet run on physical Beken hardware.** Radio behavior, ARM9 crypto
+latency and runtime memory headroom still require UART measurements. This is a
+development device with public test attestation credentials, not a certified product.
 
-## Einstieg
+## Start here
 
-- **[Bauen, in bestehende Geräte einbinden und koppeln](docs/matter-server.md)**
-- [Architektur und Wiederverwendung](docs/architecture.md)
-- [Prüfergebnisse und Grenzen](docs/validation.md)
-- [Hardware-Machbarkeit, Zigbee/BLE und Quellen](docs/feasibility.md)
+1. Read the [first hardware test procedure](docs/first-hardware-test.md).
+2. Follow the [build, installation and pairing guide](docs/matter-server.md).
+3. Record the result using [the test report template](docs/hardware-test-report.md).
 
-BK7231N hat Priorität. BK7238/T1 wird mit demselben Backend gebaut. LN882H und
-RTL8720CF haben Diagnose-/Codec-Profile; der native Server ist für diese Plattformen
-noch nicht freigegeben. BLE ersetzt keine IEEE-802.15.4-Hardware: Zigbee und
-Matter-over-Thread sind mit den untersuchten Funkmodulen nicht implementierbar.
-Matter-over-Wi-Fi benötigt BLE nicht für den laufenden Betrieb; dieser Port richtet
-sich über ein **bereits von ESPHome eingerichtetes WLAN** ein.
+Use the immutable `matter-v0.1.0-alpha.1` tag for this test. The
+`feat/esphome-matter-feasibility` branch may contain later development changes.
+[Validation results](docs/validation.md) distinguish host evidence from hardware
+measurements. See also [architecture](docs/architecture.md),
+[storage](docs/storage.md) and [hardware feasibility](docs/feasibility.md).
 
-## Komponenten
+## Included in the first test release
 
-| Komponente | Aufgabe |
-| --- | --- |
-| `libretiny_matter_server` | PASE, CASE, Attestation mit Testzertifikaten, Fabric/ACL, Interaction Model, mDNS, MRP, virtueller On/Off-Endpunkt und Subscriptions über rs-matter |
-| `libretiny_matter_storage` | Gemeinsamer FlashDB-Speicher; CHIP-Delegate und synchronisierte Anbindung des Matter-Workers |
-| `libretiny_matter` | Unveränderte C++-CHIP-Header/Codecs für Speichervertrag und unabhängige Codec-Tests |
-| `libretiny_matter_protocol` | [72 lokale Codec-Selbstprüfungen](docs/protocol-tests.md), optional auf vorhandenen Geräten |
-| `libretiny_matter_probe` | IPv6-Unicast-/Multicastdiagnose, Heap-Logs, eigenes `LTM1`-Echo auf UDP/49152 |
+- Native PASE/CASE, development attestation, fabric/ACL storage, Interaction Model,
+  MRP and mDNS from a pinned upstream stack.
+- Endpoint 1: a **virtual** On/Off light. No GPIO or relay mapping is configured.
+- Manual Matter pairing code and IP commissioning QR payload generated from the
+  device's actual configuration. Local PNG/SVG/HTML rendering is included.
+- Persistent fabric, NodeLabel and OnOff state; recovery after network changes.
+- Optional ESPHome API controls to open/close commissioning and reset **Matter only**.
+  The reset button is disabled by default; ESPHome preferences and Wi-Fi remain.
+- A read-only ESPHome diagnostic entity showing the virtual light's state.
+- Logs for startup, commissioning, storage failures, network recovery, heap,
+  slowest protocol poll and minimum remaining worker stack.
 
-Das On/Off-Licht verwendet **keine GPIOs und keine vorhandenen Relais**. Die
-Zuordnung zu echten ESPHome-Entities ist noch offen. Das Matter-WLAN-Cluster kann
-den bestehenden Netzstatus melden; Scan und Wechsel der WLAN-Zugangsdaten werden
-explizit abgewiesen. BLE-Provisionierung, Matter-OTA, Multi-Fabric-Belastungstests,
-Produktzertifikate und ein benutzerseitiger Matter-Resetknopf fehlen noch.
-ESPHome-API/OTA lassen sich weiterhin über IP nutzen; ESPHomes eigener mDNS-Responder
-muss für diesen Stand abgeschaltet sein.
+ESPHome manages the existing Wi-Fi connection. Matter Wi-Fi scan/reconfiguration,
+BLE commissioning, Matter OTA, real entity mapping and product attestation are
+outside this release. ESPHome API/OTA remain usable by IP; ESPHome's mDNS responder
+must be disabled because the Matter stack supplies its own.
 
-## Schnell bauen
+LN882H and RTL8720CF retain diagnostics and codec test profiles. They do not yet run
+this server. The investigated chips do not expose documented IEEE 802.15.4 support;
+BLE does not enable Zigbee or Matter-over-Thread on this hardware.
 
-Linux x86_64, Python 3.12, C/C++-Compiler und Rustup installieren. Den Rustup-Installer
-von [rust-lang.org](https://www.rust-lang.org/tools/install) verwenden, falls nötig.
-Für den ersten Rust-Build mindestens ungefähr 6 GiB verfügbaren RAM einplanen.
+## Build locally
+
+Use Linux x86_64, Python 3.12, a C/C++ compiler and
+[Rustup](https://www.rust-lang.org/tools/install). Allow approximately 6 GiB of
+available host RAM for the initial Rust build.
 
 ```sh
-cd experiments/esphome-matter
+git clone --branch matter-v0.1.0-alpha.1 https://github.com/seb5594/libretiny.git
+cd libretiny/experiments/esphome-matter
 python3 -m venv .venv
 . .venv/bin/activate
 pip install -r requirements-dev.txt
 rustup toolchain install nightly-2026-10-24 --profile minimal --component rust-src,rustfmt
 cp examples/secrets.yaml.example examples/secrets.yaml
-# WLAN-Zugangsdaten in examples/secrets.yaml eintragen.
+# Edit examples/secrets.yaml with your test network's Wi-Fi credentials.
 esphome compile examples/bk7231n-matter.yaml
 esphome compile examples/bk7238-t1-matter.yaml
 ```
 
-Das PlatformIO-Skript baut die gepinnte Rust-Bibliothek für `thumbv5te-none-eabi`
-und verlinkt sie in die normale LibreTiny-Firmware. Kein anderer Bootloader,
-keine geänderte Partitionstabelle und keine Binärbibliothek eines fremden Matter-SDKs.
-Der erste Build lädt Cargo-Abhängigkeiten und dauert einige Minuten. Bei mehreren
-Buildprofilen kann `LTM_CARGO_TARGET_DIR` auf ein gemeinsames absolutes Cache-Verzeichnis
-zeigen. Standardmäßig ist Rust auf einen Compilerjob begrenzt.
+`bk7231n-matter-existing.yaml` and `bk7238-t1-matter-existing.yaml` additionally
+include API, OTA and the test controls. For your existing device, import the
+[release package](docs/matter-server.md#existing-esphome-device) into its own YAML
+instead of replacing its board/pin configuration with a generic example.
 
-Für API und OTA zusätzlich gibt es `bk7231n-matter-existing.yaml` und
-`bk7238-t1-matter-existing.yaml`. Die Beispielprofile sind generisch und ersetzen
-beim Flashen die bisherige Geräteanwendung. Vor einem UART-Test das tatsächliche
-Modul/Flashlayout prüfen und ein vollständiges Backup einschließlich RF-Daten anlegen.
-Ein Netzspannungsgerät nur spannungsfrei und mit passender isolierter Versorgung testen.
+PlatformIO builds the locked Rust library for `thumbv5te-none-eabi` and links it
+into the normal firmware. Bootloader and flash partitions are unchanged. Set
+`LTM_CARGO_TARGET_DIR` to a shared absolute cache directory when building several
+profiles. Cargo uses one compiler job to limit host RAM use.
 
-## Tests reproduzieren
+## Components and tests
+
+| Component | Purpose |
+| --- | --- |
+| `libretiny_matter_server` | Native Matter server and LibreTiny platform integration |
+| `libretiny_matter_storage` | CHIP storage delegate over the existing ESPHome FlashDB |
+| `libretiny_matter` | Unmodified upstream C++ headers/codecs used by storage and codec tests |
+| `libretiny_matter_protocol` | [72 local codec checks](docs/protocol-tests.md) for existing devices |
+| `libretiny_matter_probe` | IPv6/multicast diagnostics, heap logs and `LTM1` echo on UDP/49152 |
 
 ```sh
 esphome compile tests/host.yaml
@@ -86,13 +92,11 @@ python tools/fetch_flashdb.py
 pytest -q
 ```
 
-Die vollständigen Matter-Netzwerktests verwenden einen **unabhängigen C++-Controller**,
-die identische Rust-Serverbibliothek, den identischen UDP-Adapter und echte FlashDB
-auf einem NOR-Simulator. Einrichtung und Aufruf stehen in
-[der Serveranleitung](docs/matter-server.md#unabhängige-interoperabilitätstests).
-GitHub Actions führt die Hosttests, diese Interoperabilitätstests und 14 Firmwareprofile
-aus. Controller-Zugangsdaten und simulierte Flashabbilder werden nicht veröffentlicht.
+The [independent interoperability suite](docs/matter-server.md#independent-interoperability-tests)
+uses a ConnectedHomeIP C++ controller, the firmware's Rust library and UDP adapter,
+and real FlashDB on simulated NOR. CI also builds 14 firmware profiles. It publishes
+only a test summary, not controller credentials, setup logs or flash images.
 
-Die getrennten Diagnoseprofile `bk7231n.yaml`, `bk7238-t1.yaml`, `ln882h.yaml` und
-`rtl8720cf.yaml` bleiben verfügbar. Bei Beken kann `tools/check_udp.py` das
-Diagnose-Echo über IPv6 testen; dieses Echo ist unabhängig vom Matter-Protokoll.
+The separate `bk7231n.yaml`, `bk7238-t1.yaml`, `ln882h.yaml` and `rtl8720cf.yaml`
+diagnostic profiles remain available. `tools/check_udp.py` exercises their Beken
+IPv6 echo service; that diagnostic protocol is separate from Matter.

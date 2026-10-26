@@ -17,9 +17,13 @@ class MatterServer : public Component {
   void set_discriminator(uint16_t value) { this->config_.discriminator = value; }
   void set_commissioning_seconds(uint16_t value) { this->config_.commissioning_seconds = value; }
   void set_log_setup_codes(bool value) { this->config_.log_setup_codes = value; }
+  bool open_commissioning_window() { return this->request_control_(LtmCommand::OPEN_WINDOW); }
+  bool close_commissioning_window() { return this->request_control_(LtmCommand::CLOSE_WINDOW); }
+  bool factory_reset_matter() { return this->request_control_(LtmCommand::FACTORY_RESET); }
   bool get_on_off() const { return this->on_off_; }
 
  protected:
+  bool request_control_(LtmCommand command);
   bool start_();
   bool read_network_(LtmConfig &config);
   libretiny_matter_storage::MatterStorage *storage_{};

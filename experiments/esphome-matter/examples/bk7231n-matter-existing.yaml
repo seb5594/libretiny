@@ -1,6 +1,7 @@
 # Representative existing ESPHome installation with API and OTA over official LibreTiny.
 packages:
   base: !include bk7231n-matter.yaml
+  controls: !include matter-controls.yaml
 
 esphome:
   name: matter-bk7231n-existing

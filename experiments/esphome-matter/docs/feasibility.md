@@ -1,117 +1,106 @@
-# Machbarkeit und Quellen
+# Hardware feasibility and sources
 
-Untersucht am 24./25.10.2026. Eine bestandene Kompilierung ist kein Nachweis für
-Funkbetrieb, Pairing, Interoperabilität oder Zertifizierung.
+Investigated October 24–26, 2026. A successful build does not prove radio operation,
+pairing on hardware, interoperability with every ecosystem or certification.
 
-## Entscheidung pro MCU
+## Per-MCU decision
 
-| MCU | Zigbee ohne zusätzliche Funkhardware | Matter über WLAN | Nächste technische Hürde |
+| MCU | Zigbee without extra radio hardware | Matter over Wi-Fi | Next technical gate |
 | --- | --- | --- | --- |
-| BK7231N | Kein dokumentiertes IEEE-802.15.4-Funkmodul | Nativer rs-matter-Server gebaut; Host-Interoperabilität bestanden | Funkbetrieb, Laufzeit-Heap/Stack und TRNG auf Hardware messen |
-| BK7238 / Tuya T1 | Kein dokumentiertes IEEE-802.15.4-Funkmodul | Derselbe native rs-matter-Server gebaut; offizielles LibreTiny | Hardwaremessung; BLE/WLAN-Koexistenz separat |
-| LN882H | Kein dokumentiertes IEEE-802.15.4-Funkmodul | WLAN-Hardware grundsätzlich passend; Port offen | IPv6 durch ESPHome/LibreTiny durchgängig nutzbar machen |
-| RTL8720C | Kein dokumentiertes IEEE-802.15.4-Funkmodul | WLAN-Hardware grundsätzlich passend; Port offen | IPv6, knapper RAM und genaue CF/CM-/Flashvariante |
+| BK7231N | No documented IEEE 802.15.4 radio | Native rs-matter server built; host interoperability passes | Measure radio behavior, runtime heap/stack and TRNG on hardware |
+| BK7238 / Tuya T1 | No documented IEEE 802.15.4 radio | Same native server built using official LibreTiny | Hardware measurements; BLE/Wi-Fi coexistence separately |
+| LN882H | No documented IEEE 802.15.4 radio | Wi-Fi hardware is suitable in principle; server port pending | End-to-end IPv6 support through ESPHome/LibreTiny |
+| RTL8720C | No documented IEEE 802.15.4 radio | Wi-Fi hardware is suitable in principle; server port pending | IPv6, limited RAM and exact CF/CM/flash variant |
 
-„LN88H“ wird hier als LN882H interpretiert. Für RTL8720C wurde konkret
-`generic-rtl8720cf-2mb-992k` gebaut; daraus folgt keine Prüfung aller RTL8720C-Module.
+“LN88H” is interpreted as LN882H. RTL builds use `generic-rtl8720cf-2mb-992k`;
+this does not validate all RTL8720C modules.
 
-Zigbee benötigt IEEE 802.15.4 PHY/MAC. WLAN und BLE nutzen zwar ebenfalls das
-2,4-GHz-Band, bieten aber andere Modulation und Paketformate. In den untersuchten
-Chips/SDKs ist keine nutzbare 802.15.4-Unterstützung dokumentiert. Ein Softwareport
-der ESPHome-Zigbee-Komponente kann das nicht ergänzen. Ein externer 802.15.4-NCP
-wäre ein anderes Hardwareprojekt und benötigte einen neuen Backend-Treiber.
-Dasselbe Funkproblem betrifft Matter-over-Thread. Matter-over-Wi-Fi verwendet
-dagegen IPv6 über WLAN; BLE kann zur Einrichtung dienen und ist kein Voraussetzung
-für den späteren IP-Betrieb. Die erste Portierung soll im bereits eingerichteten
-WLAN provisioniert werden; Kompatibilität dieses Ablaufs muss pro Controller
-praktisch geprüft werden.
+Zigbee requires IEEE 802.15.4 PHY/MAC. Wi-Fi and BLE share the 2.4-GHz band but use
+different modulation and packet formats. The investigated chips/SDKs have no
+documented usable 802.15.4 support. Porting ESPHome's Zigbee component cannot supply
+that radio capability. An external 802.15.4 NCP would be a separate hardware project
+requiring a backend driver. Matter-over-Thread has the same radio requirement.
 
-## Beken ist nicht eine einheitliche Plattform
+Matter-over-Wi-Fi uses IPv6 over Wi-Fi. BLE may assist initial provisioning but is
+not needed for IP operation. This first port commissions through an already
+configured LAN. The controller must support that flow and development attestation.
 
-BK7231N und BK7238 verwenden in LibreTiny einen ARM968E-S / ARMv5TE-Build.
-„Beken wird von Matter unterstützt“ ist alleine nicht aussagekräftig:
+## Beken is not one uniform platform
 
-- Der offizielle [Beken-Beispielbuild von connectedhomeip][chip-example] beschreibt
-  BK7235 mit Armino und einer RISC-V-Toolchain. Das ist kein Drop-in für BK7231N/T1.
-- Das [Sparkleiot-BK7238-Plug-SDK][plug-sdk] enthält dagegen `src/platform/Beken`,
-  ARM968E-S-Buildflags, FreeRTOS und ein On/Off-Steckdosenbeispiel. Das ist eine
-  relevante Portierungsreferenz. `build.sh` nennt zusätzlich BK7231N-Module;
-  diese Einträge allein beweisen keinen funktionierenden BK7231N-Build.
-- Dieses SDK bindet vorgebaute Bibliotheken und Quectel-Anpassungen ein
-  (`libqladapt.a`, Git LFS). Apache-Lizenzhinweise am CHIP-Code gelten nicht
-  automatisch für jede andere Datei oder Binärbibliothek. Es wird in diesem
-  Experiment kein Fremd-SDK-Code kopiert oder ausgeliefert.
-- Seine [2-MB-Partitionstabelle][sdk-flash] enthält andere App-, OTA-, RF- und
-  Matter-Datenbereiche als [Tuya T1 in LibreTiny][t1-flash]. Portierung bedeutet
-  daher Schnittstellen anpassen, nicht dessen komplettes Image übernehmen.
+BK7231N and BK7238 use ARM968E-S / ARMv5TE builds in LibreTiny. A generic statement
+that Beken supports Matter is insufficient:
 
-## Speicher und SDK-Details
+- The official [connectedhomeip Beken example][chip-example] targets BK7235 with
+  Armino and a RISC-V toolchain. It is not a drop-in for BK7231N/T1.
+- The [Sparkleiot BK7238 plug SDK][plug-sdk] contains `src/platform/Beken`, ARM968E-S
+  flags, FreeRTOS and an On/Off plug example. It is a useful porting reference.
+  BK7231N entries in `build.sh` alone do not prove a working build for that chip.
+- That SDK includes prebuilt libraries and Quectel adaptations (`libqladapt.a`,
+  Git LFS). Apache notices in CHIP do not automatically license every other file
+  or binary. This experiment does not copy or distribute that third-party SDK.
+- Its [2-MB partition table][sdk-flash] differs from [LibreTiny Tuya T1][t1-flash]
+  in application, OTA, RF and Matter data regions. Porting requires adapting
+  interfaces, not flashing the complete SDK image.
 
-[LibreTinys Beken-Basisprofil][bk-board] nennt 2 MiB Flash und 256 KiB RAM. Der
-ausgewiesene logische Anwendungsbereich beträgt 1.083.136 Byte, nicht 2 MiB.
-CRC-Blöcke, Bootloader, OTA-Download und Kalibrierungs-/Datenbereiche sind getrennt
-zu berücksichtigen. Das T1-Profil hat seine eigene physische Aufteilung.
+## Memory and SDK details
 
-Beim BK7231N endet die dynamische Heapregion laut [Implementierung][bk-heap] nach
-192 KiB im normalen RAM; zusätzlich existieren getrennte TCM-Bereiche. Die Rechnung
-„256 KiB minus vom Linker gemeldete RAM-Belegung = freier Heap“ wäre falsch.
-WLAN, lwIP und RTOS belegen außerdem zur Laufzeit Speicher. Ein sicherer
-Maximalumfang an Matter-Endpunkten lässt sich aus diesen Zahlen nicht ableiten.
+[LibreTiny's Beken base profile][bk-board] lists 2 MiB flash and 256 KiB RAM. Its
+logical application limit is 1,083,136 bytes, not 2 MiB. CRC blocks, bootloader,
+OTA download and calibration/data regions must be considered separately. T1 has
+its own physical layout.
 
-Für das Experiment wählt ESPHome BDK 3.0.33 für BK7231N und 3.0.78 für BK7238.
-Diese Unterschiede müssen im späteren gemeinsamen Backend gekapselt werden.
-Die aktuelle ESPHome-[BLE-Komponente][ble] unterstützt BK7231N, sperrt BK7238
-jedoch wegen des SDK-Hängers bei WLAN-STA-Aktivierung mit BLE. Physisch vorhandenes
-BLE ist deshalb noch keine fertige Matter-BLE-Provisionierung. Die Minimalprofile
-lassen ESPHome unbenutztes BLE abschalten.
+On BK7231N, the [heap implementation][bk-heap] ends the dynamic region at 192 KiB
+of normal RAM; TCM regions are separate. Subtracting linker RAM from 256 KiB does
+not give available heap. Wi-Fi, lwIP and RTOS also allocate at runtime. These
+figures alone cannot establish a safe maximum Matter endpoint count.
 
-Die Entropieanbindung braucht wegen folgender SDK-Eigenschaften besondere Sorgfalt:
+ESPHome selects BDK 3.0.33 for BK7231N and 3.0.78 for BK7238. The platform backend
+must accommodate both. The examined [ESPHome BLE component][ble] supports BK7231N
+but blocks BK7238 because its SDK hangs when enabling Wi-Fi STA alongside BLE.
+Physical BLE support therefore does not imply working Matter BLE provisioning.
+The minimal profiles let ESPHome disable unused BLE.
 
-- [LibreTinys `lt_rand_bytes()`][random] verwendet `rand()`.
-- BDK 3.0.33 verwendet im [mbedTLS-Hardwareadapter][old-entropy] ebenfalls `rand()`.
-- Sein [TRNG-Treiber][old-trng] existiert, befüllt bei `BkRandomNumberRead()` aber
-  höchstens ein Wort pro Aufruf. Ein großer Bufferaufruf wäre unvollständig.
-- BDK 3.0.78 hat einen anderen Adapter und einen überarbeiteten Treiber. Auch
-  dort ersetzt ein passender Funktionsname keine Prüfung von Initialisierung,
-  Fehlerfällen und Entropiequalität.
+Entropy needs particular care:
 
-Der native Server verwendet deshalb direkt den TRNG-Geräteaufruf, wortweise und
-mit Fehler-/Wiederholungskontrolle. Hosttests prüfen volle Puffer, Grenzen und
-Fehlerfälle. Er verwendet keinen rand()-Fallback. Die tatsächliche Entropiequalität
-und Initialisierung auf Beken-Hardware sind weiterhin zu prüfen. Protokoll- und
-Kryptoverfahren stammen aus rs-matter/RustCrypto.
+- [LibreTiny `lt_rand_bytes()`][random] uses `rand()`.
+- BDK 3.0.33's [mbedTLS hardware adapter][old-entropy] also uses `rand()`.
+- Its [TRNG driver][old-trng] exists, but `BkRandomNumberRead()` fills at most one
+  word per call. Passing a larger buffer would leave it incomplete.
+- BDK 3.0.78 has another adapter and revised driver. A promising function name
+  does not establish correct initialization, error handling or entropy quality.
 
-## Wiederverwendung von ESPHome
+The server therefore calls the TRNG device directly, word by word, with error and
+repetition checks. Host tests cover complete buffers, boundaries and failures.
+There is no `rand()` fallback. Actual entropy quality and Beken initialization
+still need hardware checks. Protocol and cryptography come from rs-matter/RustCrypto.
 
-[DavidvtWout/esphome-matter][esphome-matter] ist ein wertvolles Vorbild für
-Endpunktzuordnung und YAML. Die Implementierung basiert aber auf `esp-matter`
-und ESP-IDF. Ein zusätzlich erlaubter Plattformname in der Validierung würde
-keinen LibreTiny-Port ergeben. BLE-Pairing ist dort laut untersuchtem README
-ebenfalls nicht der funktionierende Standardpfad.
+## Reusing ESPHome patterns
 
-Die native [ESPHome-Zigbee-Komponente][zigbee] unterstützt inzwischen ESP32 und
-Zephyr und trennt deren Backends. Dieses Muster passt zu einer späteren
-plattformneutralen Matter-Komponente: gemeinsames Schema, gemeinsame
-Entity-Zuordnung, getrennte Plattformanbindung. Zigbee- und Matter-Cluster sind
-dennoch keine austauschbare Binärschnittstelle.
+[DavidvtWout/esphome-matter][esphome-matter] is a useful reference for endpoint
+mapping and YAML, but depends on `esp-matter`/ESP-IDF. Allowing another platform name
+in validation would not create a LibreTiny port. Its examined README also does not
+present BLE pairing as the working default path.
 
-Die vorhandene [ESPHome-Netzwerkkonfiguration][network] unterstützt IPv6 für
-Beken mit LibreTiny ab 1.7.0; sie setzt unter anderem `CONFIG_IPV6`. Für LN882H
-und RTL87xx fehlt die entsprechende Freigabe. Diese Beschränkung ist eine Aussage
-über den untersuchten Softwarestand, keine physikalische Unmöglichkeit von IPv6.
+The native [ESPHome Zigbee component][zigbee] separates ESP32 and Zephyr backends.
+That pattern suits a platform-neutral Matter component: common schema/entity
+mapping and separate platform integration. Zigbee and Matter clusters are still
+not interchangeable binary interfaces.
 
-## Einschätzung
+[ESPHome networking][network] enables IPv6 on Beken with LibreTiny 1.7.0 or later,
+including `CONFIG_IPV6`. LN882H and RTL87xx are not enabled there. This is a software
+limitation in the investigated versions, not a physical impossibility of IPv6.
 
-Der aussichtsreichste Weg für unveränderte Geräte ist ein schlanker, nativer
-Matter-over-Wi-Fi-Port mit zunächst einem On/Off-Endpunkt und Provisionierung
-über das vorhandene LAN. BK7231N bleibt Hauptziel; BK7238/T1 dient parallel als
-zweites Buildziel. Der Server passt in beide regulären Apppartitionen und koppelt
-sich auf dem Host mit einem unabhängigen CHIP-Controller. Ein verbindliches
-„läuft auf dem Gerät“ benötigt weiterhin Messungen während PASE/CASE auf ARM9.
+## Assessment
 
-Eine externe lokale Matter-Bridge könnte ESPHome-Geräte ebenfalls in mehrere
-Ökosysteme einbinden, würde aber zusätzliche laufende Infrastruktur verlangen.
-Sie wurde hier nicht als Ersatz für den gewünschten nativen Port implementiert.
+A small native Matter-over-Wi-Fi server with one initial OnOff endpoint and existing
+LAN provisioning is the most promising route for unmodified devices. BK7231N remains
+the priority; BK7238/T1 is the second build target. The server fits both normal app
+partitions and pairs with an independent CHIP controller on the host. Confirming
+that it works on devices still requires measurements during PASE/CASE on ARM9.
+
+An external local Matter bridge could also expose ESPHome devices to several
+ecosystems, but would require additional running infrastructure. This work implements
+the requested native port.
 
 [bk-board]: https://github.com/seb5594/libretiny/blob/c81bc9cef83ffd42fcffce32b8b08793b2400b9f/boards/_base/beken-72xx.json
 [bk-heap]: https://github.com/seb5594/libretiny/blob/c81bc9cef83ffd42fcffce32b8b08793b2400b9f/cores/beken-72xx/base/api/lt_mem.c

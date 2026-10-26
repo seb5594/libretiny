@@ -4,9 +4,9 @@ external_components:
   - source:
       type: git
       url: https://github.com/seb5594/libretiny
-      ref: feat/esphome-matter-feasibility
+      ref: matter-v0.1.0-alpha.1
       path: experiments/esphome-matter/components
-    refresh: 1h
+    refresh: never
     components: [libretiny_matter, libretiny_matter_protocol]
 
 libretiny_matter_protocol:

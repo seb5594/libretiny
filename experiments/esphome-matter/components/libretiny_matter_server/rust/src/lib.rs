@@ -9,7 +9,8 @@ use core::mem::MaybeUninit;
 use core::pin::{pin, Pin};
 use core::task::{Context, Poll, Waker};
 
-use embassy_futures::select::select4;
+use embassy_futures::select::{select, select4, Either};
+use embassy_time::Timer;
 use rs_matter::crypto::default_crypto;
 use rs_matter::dm::clusters::app::on_off::{self, NoLevelControl, OnOffHandler, OnOffHooks};
 use rs_matter::dm::clusters::basic_info::BasicInfoConfig;
@@ -116,7 +117,17 @@ fn data_model<'a>(
     )
 }
 
-type ServiceFuture = impl Future<Output = Result<(), Error>>;
+enum ServiceError {
+    Protocol(Error),
+    Reset(Error),
+}
+impl From<Error> for ServiceError {
+    fn from(error: Error) -> Self {
+        Self::Protocol(error)
+    }
+}
+
+type ServiceFuture = impl Future<Output = Result<(), ServiceError>>;
 #[define_opaque(ServiceFuture)]
 fn service(stack: &'static Stack, config: &'static Config) -> ServiceFuture {
     async move {
@@ -147,7 +158,7 @@ fn service(stack: &'static Stack, config: &'static Config) -> ServiceFuture {
             matter.has_fabrics()
         );
         if !matter.has_fabrics() {
-            matter.open_basic_comm_window(config.commissioning_seconds, &crypto, &())?;
+            im.open_basic_comm_window(config.commissioning_seconds)?;
             if config.log_setup_codes != 0 {
                 log_setup_codes(config)?;
             }
@@ -171,23 +182,65 @@ fn service(stack: &'static Stack, config: &'static Config) -> ServiceFuture {
         let responder = DefaultResponder::new(&im);
         let mut mdns = BuiltinMdns::new();
         log::info!("Starting UDP/5540, mDNS, secure sessions and subscriptions");
-        let result = select4(
-            pin!(matter.run(&crypto, Socket(0), Socket(0), Socket(0))),
-            pin!(mdns.run(
-                Socket(1),
-                Socket(1),
-                &host,
-                Some(host.ip),
-                (config.interface != 0).then_some(config.interface),
-                matter,
-                &crypto
-            )),
-            pin!(responder.run::<4, 4>()),
-            pin!(im.run()),
-        )
-        .coalesce()
-        .await;
-        result
+        // Local controls run on the same task as the protocol. Drop transport,
+        // responder and timer futures before resetting their persistent state.
+        let result = {
+            let network = async {
+                select4(
+                    pin!(matter.run(&crypto, Socket(0), Socket(0), Socket(0))),
+                    pin!(mdns.run(
+                        Socket(1),
+                        Socket(1),
+                        &host,
+                        Some(host.ip),
+                        (config.interface != 0).then_some(config.interface),
+                        matter,
+                        &crypto
+                    )),
+                    pin!(responder.run::<4, 4>()),
+                    pin!(im.run()),
+                )
+                .coalesce()
+                .await
+            };
+            let controls = async {
+                loop {
+                    match unsafe { platform::ltm_platform_take_command() } {
+                        0 => (),
+                        1 => match im.open_basic_comm_window(config.commissioning_seconds) {
+                            Ok(()) => {
+                                if config.log_setup_codes != 0 {
+                                    log_setup_codes(config)?;
+                                }
+                                log::info!("Local commissioning window opened");
+                            }
+                            Err(error) => {
+                                log::warn!("Cannot open commissioning window: {:?}", error)
+                            }
+                        },
+                        2 => {
+                            im.close_comm_window()?;
+                            log::info!("Local commissioning window closed");
+                        }
+                        3 => return Ok::<(), Error>(()),
+                        command => log::warn!("Unknown local command {}", command),
+                    }
+                    Timer::after_millis(100).await;
+                }
+            };
+            select(network, controls).await
+        };
+        match result {
+            Either::First(result) => result.map_err(ServiceError::Protocol),
+            Either::Second(result) => {
+                result?;
+                log::info!("Resetting Matter state; ESPHome preferences retained");
+                im.factory_reset().await.map_err(ServiceError::Reset)?;
+                matter.factory_reset(&kv).map_err(ServiceError::Reset)?;
+                log::info!("Matter factory reset completed");
+                Ok(())
+            }
+        }
     }
 }
 
@@ -263,6 +316,8 @@ pub unsafe extern "C" fn ltm_server_init(config: *const Config) -> i32 {
         serial_no: serial,
         device_name: "LibreTiny Matter",
         product_name: "LibreTiny test light",
+        sw_ver: 1,
+        sw_ver_str: env!("CARGO_PKG_VERSION"),
         // Slow ARM9 crypto must not cause aggressive retransmission bursts.
         sai: Some(1000),
         sii: Some(1000),
@@ -271,6 +326,7 @@ pub unsafe extern "C" fn ltm_server_init(config: *const Config) -> i32 {
     let stack = (&mut *core::ptr::addr_of_mut!(STACK)).init_with(Stack::init(info, cfg));
     (&mut *core::ptr::addr_of_mut!(FUTURE)).write(service(stack, cfg));
     INITIALIZED = true;
+    log::info!("LibreTiny Matter {}", env!("CARGO_PKG_VERSION"));
     log::info!(
         "Matter memory: state={} bytes, future={} bytes",
         core::mem::size_of::<Stack>(),
@@ -289,8 +345,17 @@ pub unsafe extern "C" fn ltm_server_poll() -> i32 {
         Poll::Pending => 0,
         Poll::Ready(result) => {
             FINISHED = true;
-            log::error!("Matter server stopped: {:?}", result);
-            -1
+            match result {
+                Ok(()) => 1,
+                Err(ServiceError::Protocol(error)) => {
+                    log::error!("Matter server stopped: {:?}", error);
+                    -1
+                }
+                Err(ServiceError::Reset(error)) => {
+                    log::error!("Matter reset failed; manual recovery required: {:?}", error);
+                    -2
+                }
+            }
         }
     }
 }

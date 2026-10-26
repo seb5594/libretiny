@@ -115,6 +115,16 @@ def main():
     state = build / "device"
     server, log = start("commission", state)
     try:
+        server.send_signal(signal.SIGWINCH)
+        wait_for(server, log, "Local commissioning window closed")
+        server.send_signal(signal.SIGUSR2)
+        wait_for(server, log, "Local commissioning window opened")
+        stages.append(
+            {
+                "stage": "local-controls",
+                "checks": ["commissioning window closed and reopened"],
+            }
+        )
         run_controller(
             "commission",
             storage,
@@ -134,7 +144,49 @@ def main():
         server.send_signal(signal.SIGUSR1)
         wait_for(server, log, "WARM_RESTART")
         assert "Matter setup:" not in log.read_text()
+        server.send_signal(signal.SIGUSR2)
+        wait_for(server, log, "Local commissioning window opened")
+        server.send_signal(signal.SIGWINCH)
+        wait_for(server, log, "Local commissioning window closed")
+        stages[0]["checks"][
+            0
+        ] = "commissioning window closed/reopened before pairing and on paired device"
         run_controller("warm-restart", storage, "--existing")
+        server.send_signal(signal.SIGHUP)
+        wait_for(server, log, "Matter factory reset completed")
+        wait_for(server, log, "RESET_PRESERVED_ESPHOME_PREFERENCES")
+        wait_for(server, log, "commissioned=false")
+        stages.append(
+            {
+                "stage": "reset-storage",
+                "checks": ["Matter reset preserved the ESPHome preference sentinel"],
+            }
+        )
+        run_controller("reset-revocation", storage, "--expect-unpaired")
+        run_controller(
+            "reset-recommission",
+            build / "reset-controller.json",
+            "--setup-log",
+            str(log),
+            "--fresh-state",
+        )
+    finally:
+        stop(server)
+
+    server, log = start("reset-failure", state, LTM_TEST_FAIL_REMOVE="1")
+    try:
+        server.send_signal(signal.SIGHUP)
+        assert server.wait(timeout=15) == 1
+        output = log.read_text()
+        assert "REMOVE key=" in output and "error=159" in output
+        assert "Matter reset failed; manual recovery required" in output
+        assert "Matter factory reset completed" not in output
+        stages.append(
+            {
+                "stage": "reset-failure",
+                "checks": ["flash erase failure stops reset without claiming success"],
+            }
+        )
     finally:
         stop(server)
 
@@ -208,6 +260,7 @@ def main():
         {"stage": "entropy-failure", "checks": ["failed closed before commissioning"]}
     )
     report = {
+        "version": "0.1.0-alpha.1",
         "controller": "ConnectedHomeIP 2025.7.0",
         "hardware_tested": False,
         "stages": stages,

@@ -1,7 +1,14 @@
 {
+  "version": "0.1.0-alpha.1",
   "controller": "ConnectedHomeIP 2025.7.0",
   "hardware_tested": false,
   "stages": [
+    {
+      "stage": "local-controls",
+      "checks": [
+        "commissioning window closed/reopened before pairing and on paired device"
+      ]
+    },
     {
       "stage": "commission",
       "checks": [
@@ -15,6 +22,7 @@
         "PASS command Toggle: True",
         "PASS subscription: changed OnOff attribute reported",
         "PASS BasicInformation product identity",
+        "PASS BasicInformation alpha software version",
         "PASS WriteAttribute: NodeLabel updated and read back",
         "PASS WriteAttribute: read-only OnOff attribute rejected",
         "PASS ACL: authenticated controller without grant rejected",
@@ -33,6 +41,7 @@
         "PASS command Toggle: True",
         "PASS subscription: changed OnOff attribute reported",
         "PASS BasicInformation product identity",
+        "PASS BasicInformation alpha software version",
         "PASS WriteAttribute: NodeLabel updated and read back",
         "PASS WriteAttribute: read-only OnOff attribute rejected",
         "PASS ACL: authenticated controller without grant rejected",
@@ -51,12 +60,53 @@
         "PASS command Toggle: True",
         "PASS subscription: changed OnOff attribute reported",
         "PASS BasicInformation product identity",
+        "PASS BasicInformation alpha software version",
         "PASS WriteAttribute: NodeLabel updated and read back",
         "PASS WriteAttribute: read-only OnOff attribute rejected",
         "PASS ACL: authenticated controller without grant rejected",
         "PASS unsupported endpoint rejected",
         "PASS malformed UDP: 98 datagrams; authenticated read still works",
         "PASS persisted-state checkpoint: OnOff=true"
+      ]
+    },
+    {
+      "stage": "reset-storage",
+      "checks": [
+        "Matter reset preserved the ESPHome preference sentinel"
+      ]
+    },
+    {
+      "stage": "reset-revocation",
+      "checks": [
+        "PASS reset: previous fabric can no longer authenticate"
+      ]
+    },
+    {
+      "stage": "reset-recommission",
+      "checks": [
+        "PASS onboarding: manual/QR match independent CHIP codecs; IP discovery",
+        "PASS onboarding: invalid manual-code check digit rejected",
+        "PASS commissioning: PASE, attestation, CSR, AddNOC, CASE, complete",
+        "PASS reset: fresh OnOff, NodeLabel and exactly one new fabric",
+        "PASS command Off: False",
+        "PASS command On: True",
+        "PASS command Toggle: False",
+        "PASS command Toggle: True",
+        "PASS subscription: changed OnOff attribute reported",
+        "PASS BasicInformation product identity",
+        "PASS BasicInformation alpha software version",
+        "PASS WriteAttribute: NodeLabel updated and read back",
+        "PASS WriteAttribute: read-only OnOff attribute rejected",
+        "PASS ACL: authenticated controller without grant rejected",
+        "PASS unsupported endpoint rejected",
+        "PASS malformed UDP: 98 datagrams; authenticated read still works",
+        "PASS persisted-state checkpoint: OnOff=true"
+      ]
+    },
+    {
+      "stage": "reset-failure",
+      "checks": [
+        "flash erase failure stops reset without claiming success"
       ]
     },
     {
@@ -77,6 +127,7 @@
         "PASS command Toggle: True",
         "PASS subscription: changed OnOff attribute reported",
         "PASS BasicInformation product identity",
+        "PASS BasicInformation alpha software version",
         "PASS WriteAttribute: NodeLabel updated and read back",
         "PASS WriteAttribute: read-only OnOff attribute rejected",
         "PASS ACL: authenticated controller without grant rejected",

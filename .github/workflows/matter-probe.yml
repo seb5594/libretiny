@@ -2,6 +2,7 @@ name: ESPHome Matter port checks
 
 on:
   push:
+    branches: ["**"]
     paths:
       - experiments/esphome-matter/**
       - .github/workflows/matter-probe.yml
