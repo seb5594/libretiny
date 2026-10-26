@@ -1,0 +1,21 @@
+# Add this package to an existing LibreTiny/ESPHome device configuration.
+# Keep that device's board, pins, Wi-Fi, API and OTA configuration.
+external_components:
+  - source:
+      type: git
+      url: https://github.com/seb5594/libretiny
+      ref: matter-v0.1.0-alpha.1
+      path: experiments/esphome-matter/components
+    refresh: never
+    components: [libretiny_matter, libretiny_matter_protocol]
+
+libretiny_matter_protocol:
+  id: matter_protocol_test
+  run_on_boot: true
+
+button:
+  - platform: template
+    name: Matter codec self-test
+    entity_category: diagnostic
+    on_press:
+      - lambda: id(matter_protocol_test).run_tests();

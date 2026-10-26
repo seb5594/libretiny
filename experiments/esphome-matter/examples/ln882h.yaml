@@ -1,0 +1,15 @@
+substitutions:
+  device_name: matter-probe-ln882h
+
+packages:
+  common: !include common.yaml
+
+ln882x:
+  board: generic-ln882h
+  framework:
+    version: 1.14.0
+    source: https://github.com/seb5594/libretiny.git#c81bc9cef83ffd42fcffce32b8b08793b2400b9f
+
+# ESPHome does not currently enable IPv6 for this family.
+network:
+  enable_ipv6: false

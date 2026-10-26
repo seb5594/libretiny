@@ -1,0 +1,28 @@
+# Add this package to a device already running ESPHome with official LibreTiny.
+# It preserves your board, framework and pin configuration.
+# Add matter_passcode: <your unique valid Matter setup code> to secrets.yaml.
+external_components:
+  - source:
+      type: git
+      url: https://github.com/seb5594/libretiny
+      ref: matter-v0.1.0-alpha.1
+      path: experiments/esphome-matter/components
+    components: [libretiny_matter, libretiny_matter_storage, libretiny_matter_server]
+
+network:
+  enable_ipv6: true
+  min_ipv6_addr_count: 1
+
+# The Matter server handles mDNS. ESPHome API/OTA remain reachable by IP address.
+mdns:
+  disabled: true
+
+libretiny_matter_server:
+  id: native_matter
+  passcode: !secret matter_passcode
+  discriminator: 3840
+  commissioning_seconds: 300
+  log_setup_codes: true
+
+packages:
+  matter_controls: !include matter-controls.yaml

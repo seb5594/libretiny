@@ -1,0 +1,18 @@
+substitutions:
+  device_name: matter-probe-bk7231n
+
+packages:
+  common: !include common.yaml
+
+bk72xx:
+  board: generic-bk7231n-qfn32-tuya
+  framework:
+    version: 1.14.0
+    source: https://github.com/seb5594/libretiny.git#c81bc9cef83ffd42fcffce32b8b08793b2400b9f
+
+network:
+  enable_ipv6: true
+  min_ipv6_addr_count: 0
+
+libretiny_matter_probe:
+  udp_echo: true

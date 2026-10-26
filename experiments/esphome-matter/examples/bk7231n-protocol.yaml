@@ -1,0 +1,11 @@
+substitutions:
+  device_name: matter-protocol-bk7231n
+
+packages:
+  base: !include bk7231n.yaml
+  protocol: !include protocol-test-local.yaml
+
+bk72xx:
+  framework:
+    # Build with the official release, without the experimental LibreTiny fork.
+    source: https://github.com/libretiny-eu/libretiny.git#v1.14.0

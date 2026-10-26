@@ -1,0 +1,14 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+
+[tool.ruff.lint]
+# Import ordering is checked by the repository's isort invocation.
+select = ["E", "F", "UP", "B"]
+
+[tool.black]
+line-length = 88

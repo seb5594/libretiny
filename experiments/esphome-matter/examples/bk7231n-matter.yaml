@@ -1,0 +1,39 @@
+esphome:
+  name: matter-bk7231n
+
+bk72xx:
+  board: generic-bk7231n-qfn32-tuya
+  framework:
+    version: 1.14.0
+    source: https://github.com/libretiny-eu/libretiny.git#v1.14.0
+
+external_components:
+  - source:
+      type: local
+      path: ../components
+    components: [libretiny_matter, libretiny_matter_storage, libretiny_matter_server]
+
+logger:
+  level: DEBUG
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  power_save_mode: none
+  reboot_timeout: 0s
+
+network:
+  enable_ipv6: true
+  min_ipv6_addr_count: 1
+
+mdns:
+  disabled: true
+
+# The Matter test device exposes endpoint 1 without touching any GPIO.
+# Test attestation credentials: this image is for development, not certification.
+libretiny_matter_server:
+  id: native_matter
+  passcode: 20202021
+  discriminator: 3840
+  commissioning_seconds: 300
+  log_setup_codes: true

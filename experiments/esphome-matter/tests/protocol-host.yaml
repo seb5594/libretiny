@@ -1,0 +1,16 @@
+esphome:
+  name: matter-protocol-host
+
+host:
+
+external_components:
+  - source:
+      type: local
+      path: ../components
+    components: [libretiny_matter, libretiny_matter_protocol]
+
+logger:
+  level: DEBUG
+
+libretiny_matter_protocol:
+  run_on_boot: true

@@ -1,0 +1,3 @@
+# Preserve vendored sources byte-for-byte; manifests verify original checksums.
+embassy-sync/** -whitespace
+rs-matter-codegen/** -whitespace

@@ -1,0 +1,25 @@
+# Optional ESPHome API controls for the virtual Matter test endpoint.
+# Requires libretiny_matter_server with id: native_matter.
+binary_sensor:
+  - platform: template
+    name: Matter test light state
+    entity_category: diagnostic
+    lambda: return id(native_matter).get_on_off();
+
+button:
+  - platform: template
+    name: Matter open commissioning
+    entity_category: config
+    on_press:
+      - lambda: id(native_matter).open_commissioning_window();
+  - platform: template
+    name: Matter close commissioning
+    entity_category: config
+    on_press:
+      - lambda: id(native_matter).close_commissioning_window();
+  - platform: template
+    name: Matter reset fabrics
+    entity_category: config
+    disabled_by_default: true
+    on_press:
+      - lambda: id(native_matter).factory_reset_matter();

@@ -1,0 +1,2 @@
+# These are upstream source headers, not Python's ignored lib/ output.
+!src/lib/

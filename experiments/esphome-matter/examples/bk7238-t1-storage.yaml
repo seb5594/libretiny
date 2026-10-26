@@ -1,0 +1,14 @@
+substitutions:
+  device_name: matter-storage-bk7238-t1
+
+packages:
+  base: !include bk7238-t1.yaml
+
+external_components:
+  - source:
+      type: local
+      path: ../components
+    components: [libretiny_matter, libretiny_matter_storage]
+
+libretiny_matter_storage:
+  id: matter_storage

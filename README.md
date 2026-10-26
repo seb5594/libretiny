@@ -35,6 +35,15 @@ which should make it easier to port/run existing ESP apps on less-common, unsupp
 
 </div>
 
+## Experimental ESPHome Matter support in this fork
+
+The [Matter test release](experiments/esphome-matter/README.md) adds a native
+ESPHome component for BK7231N and BK7238/Tuya T1 using official LibreTiny. It includes
+secure IP commissioning, setup/QR codes, a virtual On/Off light, persistent fabrics
+and local reset controls. The first alpha has software/controller tests and firmware
+builds; physical Beken validation is still required. Start with the
+[hardware test guide](experiments/esphome-matter/docs/first-hardware-test.md).
+
 ## License
 
 See [LICENSE](LICENSE). Project is licensed under MIT License.

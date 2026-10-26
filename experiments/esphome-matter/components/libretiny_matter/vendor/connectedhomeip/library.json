@@ -1,0 +1,12 @@
+{
+  "name": "LibreTinyMatterCore",
+  "version": "0.2.0",
+  "description": "Pinned upstream Matter storage interface, TLV and InvokeRequest codecs; no server",
+  "license": "Apache-2.0",
+  "build": {
+    "includeDir": "src",
+    "flags": [
+      "-I third_party/nlio/repo/include"
+    ]
+  }
+}
