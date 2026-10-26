@@ -4,7 +4,9 @@
 `libretiny_matter_server` verbindet den Project-CHIP-Stack **rs-matter** mit
 ESPHome, LibreTiny, FreeRTOS, lwIP und der vorhandenen FlashDB. Ein virtueller
 On/Off-Licht-Endpunkt lässt sich mit einem unabhängigen ConnectedHomeIP-Controller
-koppeln, schalten, lesen und abonnieren. Fabric und Schaltzustand überleben
+koppeln, schalten, lesen und abonnieren. Manueller Matter-Kopplungscode und
+QR-Nutzlast werden auf Wunsch ausgegeben; ein lokales Werkzeug erzeugt PNG/SVG
+und eine druckbare Seite. Fabric und Schaltzustand überleben
 Neustarts. Die Firmware verwendet die **offizielle LibreTiny-Version 1.14.0**.
 
 **Auf echter Beken-Hardware noch nicht ausgeführt.** Host-Interoperabilität,

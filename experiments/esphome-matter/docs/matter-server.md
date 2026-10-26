@@ -37,6 +37,48 @@ passendes Minimalimage beweist deshalb nicht, dass jede bestehende Anwendung pas
 Zum reproduzierbaren Einsatz nach einem erfolgreichen Test den Branch-Namen im Package
 und dessen `external_components`-Quelle auf den getesteten Commit pinnen.
 
+## Manueller Code und scannbarer QR-Code
+
+Die Testprofile und das Package setzen `log_setup_codes: true`. Beim Öffnen des
+Erstkopplungsfensters schreibt die Firmware eine zusammengehörige Zeile ins UART-
+oder ESPHome-Log:
+
+```text
+Matter setup: manual=34970112332 qr=MT:-24J0AFN00KA0648G00
+```
+
+[Scannbarer QR-Code für genau diese Beispielkonfiguration](../examples/matter-test-setup.svg).
+
+Das Beispiel gehört ausschließlich zu PIN `20202021`, Discriminator `3840` und den
+Test-VID/PID. **Der YAML-PIN ist nicht der elfstellige manuelle Matter-Code.**
+Die Firmware erzeugt beide Formate aus ihren tatsächlichen Einrichtungsdaten mit
+den unveränderten rs-matter-Codecs. Der manuelle Code enthält eine Prüfziffer;
+der QR-Code meldet IP-Einrichtung, kein nicht vorhandenes BLE-Provisioning.
+
+In einer Matter-App „Gerät hinzufügen“ und „Code manuell eingeben“ wählen, sofern
+die App die Einrichtung bereits im WLAN befindlicher Entwicklungsgeräte unterstützt.
+Den elfstelligen Wert hinter `manual=` verwenden. Ein scannbares Bild entsteht lokal:
+
+```sh
+# Mit gespeicherten ESPHome-/UART-Logs; wählt das zusammengehörige Codepaar.
+python tools/render_matter_qr.py --log boot.log --output matter-setup
+# Alternativ die MT:-Nutzlast direkt aus dem Geräte-Log kopieren:
+python tools/render_matter_qr.py --payload 'MT:-24J0AFN00KA0648G00' --output matter-setup
+```
+
+Das Werkzeug erstellt `matter-setup.png`, `matter-setup.svg` und
+`matter-setup.html`. Die HTML-Seite zeigt bei `--log` auch den manuellen Code und
+lässt sich lokal öffnen oder drucken. Nichts wird an einen QR-Webdienst gesendet.
+Die Abhängigkeiten werden mit `requirements-dev.txt` installiert; separat genügt
+`pip install 'qrcode[pil]==8.2'`.
+
+Ist die Ausgabe nicht gewünscht, `log_setup_codes: false` setzen (Komponentenstandard).
+Auf bereits gekoppelten Geräten werden die ursprünglichen Codes beim Neustart
+nicht erneut ausgegeben. Setup-Logs und QR-Dateien enthalten den Einrichtungscode:
+wie Zugangsdaten aufbewahren und vor dem Teilen von Diagnose-Logs entfernen.
+Der Code öffnet selbst kein Kopplungsfenster und garantiert nicht, dass ein
+kommerzieller Controller die Test-Attestation akzeptiert.
+
 ## Koppeln und bedienen
 
 Der Server öffnet beim Start ohne gespeicherte Fabric ein 300-Sekunden-Fenster.
@@ -79,13 +121,15 @@ Die Reihenfolge beim ersten Start:
 2. `Starting Matter: heap=... stack=24576 interface=...`
 3. `Loading fabric credentials and Matter state`
 4. `Matter endpoint ready; commissioned=false`
-5. `On-network commissioning open for 300 seconds`
-6. `Starting UDP/5540, mDNS, secure sessions and subscriptions`
-7. PASE, Attestation, CSR, AddNOC und CommissioningComplete; danach OnOff-Änderungen.
+5. Bei `log_setup_codes: true`: `Matter setup: manual=... qr=MT:...`
+6. `On-network commissioning open for 300 seconds`
+7. `Starting UDP/5540, mDNS, secure sessions and subscriptions`
+8. PASE, Attestation, CSR, AddNOC und CommissioningComplete; danach OnOff-Änderungen.
 
 Alle 30 Sekunden: Verbindungsstatus, virtueller Schaltzustand, freier/minimaler
 Heap, langsamster Poll und `stack_min_free`. Die FlashDB-Anbindung loggt Operation,
-Schlüssel und Größe; keine gespeicherten Zugangsdaten. Rust-Logs sind maximal INFO,
+Schlüssel und Größe; keine gespeicherten Fabric-Schlüssel. Die ausdrücklich aktivierte
+Setup-Code-Ausgabe enthält den Einrichtungscode. Rust-Logs sind maximal INFO,
 ESPHome-Logs im Testprofil DEBUG. Kein TLV-/Schlüssel-Dump wird aktiviert.
 
 Erster Test: koppeln, viermal On/Off/Toggle, Read und Subscribe; anschließend mindestens
@@ -128,7 +172,9 @@ python tools/test_matter_server.py \
 Die Ports 5353/5540 müssen verfügbar sein. Der Host veröffentlicht `::1` und seine
 LAN-IPv4; Controller und Hostserver laufen deshalb auf demselben Rechner.
 
-Geprüft werden mDNS-Erkennung, falscher PIN, komplette Kopplung mit PAA-Prüfung,
+Geprüft werden mDNS-Erkennung, falscher PIN, echte Kopplung per QR-Nutzlast und
+per manuellem Code (auch mit anderem PIN/Discriminator), unabhängiger CHIP-Codec-
+Vergleich und Prüfziffer, unterdrückte Setup-Logs sowie komplette Kopplung mit PAA-Prüfung,
 On/Off/Toggle/Read, Subscription, BasicInformation, persistiertes NodeLabel per
 WriteAttribute, Schreibschutz des OnOff-Attributs, ACL-Ablehnung eines zweiten
 Controllers ohne Grant, falscher Endpunkt und 98 fehlerhafte UDP-Datagramme mit

@@ -39,6 +39,7 @@ CONFIG_SCHEMA = cv.All(
         {
             cv.GenerateID(): cv.declare_id(MatterServer),
             cv.Required("passcode"): _passcode,
+            cv.Optional("log_setup_codes", default=False): cv.boolean,
             cv.Required("discriminator"): cv.int_range(min=0, max=4095),
             cv.Optional("commissioning_seconds", default=300): cv.int_range(
                 min=180, max=900
@@ -70,6 +71,7 @@ async def to_code(config):
     storage = await cg.get_variable(CORE.config["libretiny_matter_storage"][CONF_ID])
     cg.add(var.set_storage(storage))
     cg.add(var.set_passcode(config["passcode"]))
+    cg.add(var.set_log_setup_codes(config["log_setup_codes"]))
     cg.add(var.set_discriminator(config["discriminator"]))
     cg.add(var.set_commissioning_seconds(config["commissioning_seconds"]))
     cg.add_build_flag("-DINCLUDE_uxTaskGetStackHighWaterMark=1")

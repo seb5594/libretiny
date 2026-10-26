@@ -1,4 +1,4 @@
-# Prüfstand vom 25.10.2026
+# Prüfstand vom 26.10.2026
 
 ## Nativer Matter-Server
 
@@ -7,15 +7,16 @@ rs-matter `7195e2b1f45df94ee1bc63605b7db91a6878b9dc`.
 Unabhängiger Controller: ConnectedHomeIP-C++-SDK aus
 `home-assistant-chip-core` und `home-assistant-chip-clusters`, beide 2025.7.0.
 
-Der automatisierte Interoperabilitätslauf besteht **55 Prüfungen in sechs Phasen**:
+Der automatisierte Interoperabilitätslauf besteht **60 Prüfungen in sieben Phasen**:
 
 | Phase | Nachweis |
 | --- | --- |
-| Erstkopplung | mDNS-Erkennung, falschen PIN abweisen, PASE, PAA/DAC/PAI-Attestation, CSR, AddNOC, CASE, CommissioningComplete |
+| Erstkopplung | QR-Kopplung per mDNS, unabhängiger Codevergleich und Prüfzifferprüfung, falschen PIN abweisen, PASE, PAA/DAC/PAI-Attestation, CSR, AddNOC, CASE, CommissioningComplete |
 | Betrieb | Off/On/Toggle und Read, Subscription, BasicInformation, NodeLabel schreiben/lesen/persistieren, Schreibschutz von OnOff, ACL-Ablehnung, ungültiger Endpunkt, 98 fehlerhafte UDP-Datagramme und anschließender gültiger Read |
 | Prozessneustart | Fabric aus tatsächlicher FlashDB, CASE und persistiertes OnOff=true; Betriebstests erneut |
 | Warmstart | Rust-Future/Stack stoppen, Sockets schließen, erneut initialisieren; gleiche Fabric und Zustand; Betriebstests erneut |
-| Speicherfehler + Wiederanlauf | NOR verweigert Fabric-Schreibvorgang; CommissioningComplete scheitert; nach Neustart kein gültig gespeicherter Fabric, erneute Kopplung und Betrieb erfolgreich |
+| Speicherfehler + Wiederanlauf | NOR verweigert Fabric-Schreibvorgang; CommissioningComplete scheitert; nach Neustart kein gültig gespeicherter Fabric, erneute Kopplung per manuellem Code mit anderem PIN/Discriminator und Betrieb erfolgreich |
+| Setup-Ausgabe | Codes bei deaktivierter Ausgabe sowie nach Kopplung/Neustart unterdrückt |
 | Entropiefehler | Entropiequelle liefert Fehler; Stack stoppt vor Einrichtung, kein unsicherer Fallback |
 
 Ergebnisse: [maschinenlesbare Zusammenfassung](server-test-results.json).
@@ -24,7 +25,7 @@ FlashDB-Delegate wie die MCU-Firmware. Der Host ersetzt FreeRTOS/lwIP/Treiber du
 POSIX; FlashDB selbst läuft über den gemeinsamen 32-KiB-NOR-Simulator. Das simuliert
 kein physisches Abschalten während einer Flashoperation.
 
-Zusätzlich bestehen **82 pytest-Tests**. Dazu gehören:
+Zusätzlich bestehen **90 pytest-Tests**. Dazu gehören:
 
 - Der tatsächliche ESPHome-/FreeRTOS-Brückencode mit Plattform-Doubles und ASan/UBSan:
   Start erst mit WLAN und IPv6, Wiederverbindung, IPv6-Verlust, zu wenig Heap,
@@ -32,6 +33,8 @@ Zusätzlich bestehen **82 pytest-Tests**. Dazu gehören:
   festhängende TRNG-Ausgabe sowie ausgerichtete Allokation/Überlaufgrenzen.
 - Echte ESPHome-Konfigurationsvalidierung einschließlich verbotener Passcodes,
   Plattform-, IPv6-, mDNS-, Discriminator- und Zeitfenstergrenzen.
+- QR-Bilder mit unabhängigem ZXing-Decoder zurückgelesen, weiße Ruhezone,
+  zusammengehörige Codepaare aus Logs und Ablehnung mehrdeutiger/ungültiger Eingaben.
 - SHA-256-Prüfung unveränderter Upstream-Dateien und des öffentlichen Test-PAA.
 - Bisherige IPv6-Probe-, FlashDB- und CHIP-Codec-Tests einschließlich 20.000
   reproduzierbarer Parser-Zufallseingaben mit Address-/UndefinedBehaviorSanitizer.
@@ -50,10 +53,10 @@ Buildwerte stehen in der nachfolgenden Tabelle; `*-existing` ergänzt API und OT
 
 | Profil | Flash | statisches RAM |
 | --- | ---: | ---: |
-| BK7231N | 867.122 B | 106.884 B |
-| BK7238/T1 | 968.024 B | 110.784 B |
-| BK7231N + API/OTA | 894.502 B | 107.100 B |
-| BK7238/T1 + API/OTA | 995.480 B | 111.000 B |
+| BK7231N | 871.066 B | 106.884 B |
+| BK7238/T1 | 971.968 B | 110.784 B |
+| BK7231N + API/OTA | 898.446 B | 107.100 B |
+| BK7238/T1 + API/OTA | 999.360 B | 111.000 B |
 
 Das statische RAM laut Linker ist **kein gemessener freier Laufzeit-Heap**.
 BK7231N nutzt unterschiedliche RAM-/TCM-Bereiche; die Rechnung 256 KiB minus

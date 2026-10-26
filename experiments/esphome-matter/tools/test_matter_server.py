@@ -115,15 +115,25 @@ def main():
     state = build / "device"
     server, log = start("commission", state)
     try:
-        run_controller("commission", storage, "--discover", "--wrong-pin")
+        run_controller(
+            "commission",
+            storage,
+            "--wrong-pin",
+            "--setup-log",
+            str(log),
+            "--code-kind",
+            "qr",
+        )
         assert "PAKE failure 1 of" in log.read_text()
     finally:
         stop(server)
     server, log = start("reboot", state)
     try:
+        assert "Matter setup:" not in log.read_text()
         run_controller("reboot", storage, "--existing")
         server.send_signal(signal.SIGUSR1)
         wait_for(server, log, "WARM_RESTART")
+        assert "Matter setup:" not in log.read_text()
         run_controller("warm-restart", storage, "--existing")
     finally:
         stop(server)
@@ -142,10 +152,43 @@ def main():
         assert "error=159" in log.read_text(), "NOR write failure not exercised"
     finally:
         stop(server)
-    server, log = start("storage-recovery", failure_state)
+    server, log = start(
+        "storage-recovery",
+        failure_state,
+        LTM_TEST_PASSCODE="34567890",
+        LTM_TEST_DISCRIMINATOR="129",
+    )
     try:
         assert "commissioned=false" in log.read_text(), "failed fabric survived reboot"
-        run_controller("storage-recovery", build / "recovery-controller.json")
+        run_controller(
+            "storage-recovery",
+            build / "recovery-controller.json",
+            "--setup-log",
+            str(log),
+            "--code-kind",
+            "manual",
+            "--passcode",
+            "34567890",
+            "--discriminator",
+            "129",
+        )
+    finally:
+        stop(server)
+
+    server, log = start(
+        "hidden-setup-codes", build / "hidden-device", LTM_TEST_HIDE_SETUP_CODES="1"
+    )
+    try:
+        assert "commissioned=false" in log.read_text()
+        assert "Matter setup:" not in log.read_text()
+        stages.append(
+            {
+                "stage": "setup-code-privacy",
+                "checks": [
+                    "setup codes suppressed when disabled and after commissioning"
+                ],
+            }
+        )
     finally:
         stop(server)
 

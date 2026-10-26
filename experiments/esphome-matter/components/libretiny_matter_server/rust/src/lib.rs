@@ -22,6 +22,8 @@ use rs_matter::dm::endpoints;
 use rs_matter::dm::{Async, Cluster, DataModel, Dataver, Endpoint, Node};
 use rs_matter::error::Error;
 use rs_matter::im::{InteractionModel, InteractionModelState};
+use rs_matter::pairing::qr::{no_optional_data, CommFlowType, QrPayload};
+use rs_matter::pairing::DiscoveryCapabilities;
 use rs_matter::respond::DefaultResponder;
 use rs_matter::sc::pase::{Spake2pVerifierPassword, Spake2pVerifierPasswordRef};
 use rs_matter::transport::exchange::MatterBuffers;
@@ -53,12 +55,7 @@ struct Stack {
 }
 impl Stack {
     fn init(info: &'static BasicInfoConfig<'static>, config: &'static Config) -> impl Init<Self> {
-        let comm = BasicCommData {
-            password: Spake2pVerifierPassword::new_from_ref(Spake2pVerifierPasswordRef::new(
-                &config.passcode.to_le_bytes(),
-            )),
-            discriminator: config.discriminator,
-        };
+        let comm = basic_comm_data(config);
         init!(Self {
             matter <- Matter::init(info, comm, &TEST_DEV_ATT, MATTER_PORT),
             buffers <- MatterBuffers::init(),
@@ -151,6 +148,9 @@ fn service(stack: &'static Stack, config: &'static Config) -> ServiceFuture {
         );
         if !matter.has_fabrics() {
             matter.open_basic_comm_window(config.commissioning_seconds, &crypto, &())?;
+            if config.log_setup_codes != 0 {
+                log_setup_codes(config)?;
+            }
             log::info!(
                 "On-network commissioning open for {} seconds",
                 config.commissioning_seconds
@@ -189,6 +189,36 @@ fn service(stack: &'static Stack, config: &'static Config) -> ServiceFuture {
         .await;
         result
     }
+}
+
+fn basic_comm_data(config: &Config) -> BasicCommData {
+    BasicCommData {
+        password: Spake2pVerifierPassword::new_from_ref(Spake2pVerifierPasswordRef::new(
+            &config.passcode.to_le_bytes(),
+        )),
+        discriminator: config.discriminator,
+    }
+}
+
+/// Use the same upstream commissioning data and codecs as the actual device.
+/// No BLE/SoftAP capability is advertised: this port commissions over existing IP.
+fn log_setup_codes(config: &Config) -> Result<(), Error> {
+    let comm = basic_comm_data(config);
+    let manual = comm.compute_pairing_code();
+    let payload = QrPayload::new(
+        DiscoveryCapabilities::IP,
+        CommFlowType::Standard,
+        comm,
+        TEST_DEV_DET.vid,
+        TEST_DEV_DET.pid,
+        "",
+        no_optional_data,
+    );
+    // No optional TLV data: the QR payload is exactly 22 ASCII characters.
+    let mut buffer = [0; 64];
+    let (qr, _) = payload.as_str(&mut buffer)?;
+    log::info!("Matter setup: manual={} qr={}", manual, qr);
+    Ok(())
 }
 
 // SAFETY: these slots are private to one platform task. init is called once;

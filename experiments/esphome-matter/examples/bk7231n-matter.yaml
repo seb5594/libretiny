@@ -35,3 +35,4 @@ libretiny_matter_server:
   passcode: 20202021
   discriminator: 3840
   commissioning_seconds: 300
+  log_setup_codes: true

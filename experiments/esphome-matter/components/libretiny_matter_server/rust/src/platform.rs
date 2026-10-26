@@ -22,6 +22,7 @@ pub struct Config {
     pub ssid: [u8; 32],
     pub ssid_len: u8,
     pub mac: [u8; 8],
+    pub log_setup_codes: u8,
 }
 
 #[repr(C)]

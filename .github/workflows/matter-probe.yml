@@ -14,6 +14,11 @@ on:
 permissions:
   contents: read
 
+# Push and pull_request can refer to the same branch; run the expensive matrix once.
+concurrency:
+  group: matter-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+
 defaults:
   run:
     working-directory: experiments/esphome-matter

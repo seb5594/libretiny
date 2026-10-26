@@ -16,6 +16,7 @@ class MatterServer : public Component {
   void set_passcode(uint32_t value) { this->config_.passcode = value; }
   void set_discriminator(uint16_t value) { this->config_.discriminator = value; }
   void set_commissioning_seconds(uint16_t value) { this->config_.commissioning_seconds = value; }
+  void set_log_setup_codes(bool value) { this->config_.log_setup_codes = value; }
   bool get_on_off() const { return this->on_off_; }
 
  protected:

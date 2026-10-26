@@ -22,3 +22,4 @@ libretiny_matter_server:
   passcode: !secret matter_passcode
   discriminator: 3840
   commissioning_seconds: 300
+  log_setup_codes: true

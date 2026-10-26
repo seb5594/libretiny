@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import json
 import random
+import re
 import socket
 from pathlib import Path
 
@@ -11,14 +12,59 @@ import chip.CertificateAuthority
 import chip.clusters as clusters
 import chip.exceptions
 import chip.native
-from chip.ChipDeviceCtrl import DiscoveryFilterType
+from chip.ChipDeviceCtrl import DiscoveryFilterType, DiscoveryType
 from chip.ChipStack import ChipStack
 from chip.interaction_model import InteractionModelError, Status
+from chip.setup_payload import SetupPayload
 
 NODE = 0x12344321
 
 
-async def exercise(controller, admin, commission, discover, wrong_pin, fail_storage):
+def verify_setup(path, passcode, discriminator):
+    pairs = set(
+        re.findall(
+            r"Matter setup: manual=([0-9]{11}) qr=(MT:[A-Z0-9.-]+)", path.read_text()
+        )
+    )
+    assert len(pairs) == 1, "Expected the device's actual setup-code log"
+    manual, qr = next(iter(pairs))
+    parser = SetupPayload()
+    assert manual == parser.GenerateManualPairingCode(
+        passcode, discriminator=discriminator
+    )
+    assert qr == parser.GenerateQrCode(
+        passcode, discriminator=discriminator, capabilities=4
+    )
+    parser.ParseQrCode(qr)
+    parser.ParseManualPairingCode(manual)
+    print(
+        "PASS onboarding: manual/QR match independent CHIP codecs; IP discovery",
+        flush=True,
+    )
+    invalid = manual[:-1] + str((int(manual[-1]) + 1) % 10)
+    try:
+        parser.ParseManualPairingCode(invalid)
+    except chip.exceptions.ChipStackError:
+        pass
+    else:
+        raise AssertionError("manual code with wrong check digit accepted")
+    print("PASS onboarding: invalid manual-code check digit rejected", flush=True)
+    return {"qr": qr, "manual": manual}
+
+
+async def exercise(
+    controller,
+    admin,
+    commission,
+    discover,
+    wrong_pin,
+    fail_storage,
+    setup_log,
+    code_kind,
+    passcode,
+    discriminator,
+):
+    codes = verify_setup(setup_log, passcode, discriminator) if setup_log else None
     if wrong_pin:
         # The SDK can emit multiple completion callbacks for one failed PASE.
         # Keep that controller separate from the subsequent successful pairing.
@@ -36,12 +82,16 @@ async def exercise(controller, admin, commission, discover, wrong_pin, fail_stor
         finally:
             rejected_controller.Shutdown()
     if commission:
-        if discover:
+        if codes is not None:
+            pairing = controller.CommissionWithCode(
+                codes[code_kind], NODE, DiscoveryType.DISCOVERY_NETWORK_ONLY
+            )
+        elif discover:
             pairing = controller.CommissionOnNetwork(
-                NODE, 20202021, DiscoveryFilterType.LONG_DISCRIMINATOR, 3840
+                NODE, passcode, DiscoveryFilterType.LONG_DISCRIMINATOR, discriminator
             )
         else:
-            pairing = controller.CommissionIP("::1", 20202021, NODE)
+            pairing = controller.CommissionIP("::1", passcode, NODE)
         try:
             await asyncio.wait_for(pairing, 90)
         except chip.exceptions.ChipStackError:
@@ -176,6 +226,10 @@ def main():
     parser.add_argument("--discover", action="store_true")
     parser.add_argument("--wrong-pin", action="store_true")
     parser.add_argument("--expect-storage-failure", action="store_true")
+    parser.add_argument("--setup-log", type=Path)
+    parser.add_argument("--code-kind", choices=["qr", "manual"], default="qr")
+    parser.add_argument("--passcode", type=int, default=20202021)
+    parser.add_argument("--discriminator", type=int, default=3840)
     args = parser.parse_args()
     chip.native.Init()
     stack = ChipStack(str(args.storage), enableServerInteractions=False)
@@ -201,6 +255,10 @@ def main():
                 args.discover,
                 args.wrong_pin,
                 args.expect_storage_failure,
+                args.setup_log,
+                args.code_kind,
+                args.passcode,
+                args.discriminator,
             )
         )
         print(json.dumps(result), flush=True)

@@ -15,6 +15,7 @@ struct LtmConfig {
   uint8_t ssid[32];
   uint8_t ssid_len;
   uint8_t mac[8];
+  uint8_t log_setup_codes;
 };
 struct LtmPeer {
   uint8_t ip[16];

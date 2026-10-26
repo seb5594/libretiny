@@ -103,7 +103,12 @@ int main(int argc, char **argv) {
   LtmConfig config{};
   config.passcode = 20202021;
   config.discriminator = 3840;
+  if (const char *code = std::getenv("LTM_TEST_PASSCODE"))
+    config.passcode = std::strtoul(code, nullptr, 10);
+  if (const char *disc = std::getenv("LTM_TEST_DISCRIMINATOR"))
+    config.discriminator = std::strtoul(disc, nullptr, 10);
   config.commissioning_seconds = 300;
+  config.log_setup_codes = std::getenv("LTM_TEST_HIDE_SETUP_CODES") == nullptr;
   memcpy(config.hostname, "lt-host-test", 13);
   memcpy(config.ssid, "host-test", 9);
   config.ssid_len = 9;

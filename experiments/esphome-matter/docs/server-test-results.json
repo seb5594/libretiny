@@ -5,6 +5,8 @@
     {
       "stage": "commission",
       "checks": [
+        "PASS onboarding: manual/QR match independent CHIP codecs; IP discovery",
+        "PASS onboarding: invalid manual-code check digit rejected",
         "PASS wrong passcode rejected",
         "PASS commissioning: PASE, attestation, CSR, AddNOC, CASE, complete",
         "PASS command Off: False",
@@ -66,6 +68,8 @@
     {
       "stage": "storage-recovery",
       "checks": [
+        "PASS onboarding: manual/QR match independent CHIP codecs; IP discovery",
+        "PASS onboarding: invalid manual-code check digit rejected",
         "PASS commissioning: PASE, attestation, CSR, AddNOC, CASE, complete",
         "PASS command Off: False",
         "PASS command On: True",
@@ -79,6 +83,12 @@
         "PASS unsupported endpoint rejected",
         "PASS malformed UDP: 98 datagrams; authenticated read still works",
         "PASS persisted-state checkpoint: OnOff=true"
+      ]
+    },
+    {
+      "stage": "setup-code-privacy",
+      "checks": [
+        "setup codes suppressed when disabled and after commissioning"
       ]
     },
     {
