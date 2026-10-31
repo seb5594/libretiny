@@ -9,6 +9,7 @@
 #define __REG_GPIO_H__
 #define __REG_I2C_H__
 #define __REG_LN_UART_H__
+#define __REG_PWM_H__
 #define __REG_QSPI_H__
 #define __REG_WDT_H__
 #define __REG_SYSC_AWO_H__
@@ -55,6 +56,8 @@ extern "C" {
 #include "utils/runtime/runtime.h"
 #include "utils/system_parameter.h"
 #include <hal/hal_adc.h>
+#include <hal/hal_adv_timer.h>
+#include <hal/hal_clock.h>
 #include <hal/hal_gpio.h>
 #include <hal/hal_i2c.h>
 #include <hal/hal_interrupt.h>

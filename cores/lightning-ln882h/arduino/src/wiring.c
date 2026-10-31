@@ -64,4 +64,15 @@ void pinRemoveMode(PinInfo *pin, uint32_t mask) {
 		hal_gpio_pin_it_en(data->gpio_base, data->gpio->pin, HAL_DISABLE);
 		pinDisable(pin, PIN_IRQ);
 	}
+	if ((mask & PIN_PWM) && (pin->enabled & PIN_PWM)) {
+		// The channel stays assigned to the pin for its next analogWrite().
+		uint8_t channel = data->pwmChannel - 1;
+		uint32_t base	= ADV_TIMER_0_BASE + 0x20 * (channel / 2);
+		if (channel % 2 == 0)
+			hal_adv_tim_a_en(base, HAL_DISABLE);
+		else
+			hal_adv_tim_b_en(base, HAL_DISABLE);
+		hal_gpio_pin_afio_en(GPIO_GET_BASE(pin->gpio), GPIO_GET_PIN(pin->gpio), HAL_DISABLE);
+		pinDisable(pin, PIN_PWM);
+	}
 }

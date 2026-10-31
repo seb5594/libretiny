@@ -15,6 +15,7 @@ struct PinData_s {
 	PinStatus irqMode;
 	void *irqHandler;
 	void *irqParam;
+	uint8_t pwmChannel; // PWM channel + 1, 0 = none assigned yet
 };
 
 #define GPIO_GET_PORT(pin) (pin >> 4)
