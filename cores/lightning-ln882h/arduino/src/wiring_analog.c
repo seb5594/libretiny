@@ -132,9 +132,9 @@ static void pwmEnableChannel(uint8_t channel, hal_en_t enable) {
 void analogWrite(pin_size_t pinNumber, int value) {
 	// Every pin with an alternate function can be a PWM output.
 	pinCheckGetData(pinNumber, PIN_NONE, );
-	uint32_t gpioBase	= GPIO_GET_BASE(pin->gpio);
-	gpio_pin_t gpioPin	= GPIO_GET_PIN(pin->gpio);
-	uint32_t periodUs	= _analogWritePeriod > 0 ? _analogWritePeriod : 1;
+	uint32_t gpioBase  = GPIO_GET_BASE(pin->gpio);
+	gpio_pin_t gpioPin = GPIO_GET_PIN(pin->gpio);
+	uint32_t periodUs  = _analogWritePeriod > 0 ? _analogWritePeriod : 1;
 
 	// GPIO can't be used together with PWM
 	pinRemoveMode(pin, PIN_GPIO | PIN_IRQ);
